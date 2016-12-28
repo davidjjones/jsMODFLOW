@@ -19,4 +19,5 @@ This version partially supports the following MODFLOW modules. Parameterization 
 
 
 ### Examples:
-- [demo.htm](https://davidjjones.github.io/jsMODFLOW/demo.htm)
+- [JSON Input and Output](https://davidjjones.github.io/jsMODFLOW/demo1.htm)
+- [Impact of a Well](https://davidjjones.github.io/jsMODFLOW/demo2.htm)
