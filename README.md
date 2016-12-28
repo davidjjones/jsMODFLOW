@@ -1,4 +1,4 @@
 ## jsMODFLOW
 
 ### Examples:
-- [demo.htm](demo.htm)
+- [demo.htm](https://davidjjones.github.io/jsMODFLOW/demo.htm)
