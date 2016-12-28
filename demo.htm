@@ -86,10 +86,10 @@ var setup = function(){
       ],
       "periods": [
         {
-          "perlen": tstep,          // PERLENóis the length of a stress period
-          "nstp": 1,            // NSTPóis the number of time steps in a stress period
-          "tsmult": 1,          // TSMULTóis the multiplier for the length of successive time steps. The length of a time step is calculated by multiplying the length of the previous time step by tsmult
-          "issflg": false        // boolean variable that indicates whether the stress period is transient or steady state. True is ìsteady-stateî and false is ìtransientî
+          "perlen": tstep,          // PERLEN‚Äîis the length of a stress period
+          "nstp": 1,            // NSTP‚Äîis the number of time steps in a stress period
+          "tsmult": 1,          // TSMULT‚Äîis the multiplier for the length of successive time steps. The length of a time step is calculated by multiplying the length of the previous time step by tsmult
+          "issflg": false        // boolean variable that indicates whether the stress period is transient or steady state. True is ‚Äústeady-state‚Äù and false is ‚Äútransient‚Äù
         }
       ]
     },
@@ -117,7 +117,7 @@ var setup = function(){
           "hy": constant2DArray(rows, cols, hk),
           "sc1":constant2DArray(rows, cols, 0.001), // 
           "sc2":constant2DArray(rows, cols, 0.2), // 
-          "trpy": 1 // TRPYóis a one-dimensional variable containing a horizontal anisotropic factor for each layer and is the ratio of
+          "trpy": 1 // TRPY‚Äîis a one-dimensional variable containing a horizontal anisotropic factor for each layer and is the ratio of
                       // transmissivity or hydraulic conductivity (whichever is being used) along a column to transmissivity or hydraulic
                       // conductivity along a row. Set to 1.0 for isotropic conditions.
         }
@@ -504,11 +504,11 @@ var TimeSeriesChart = function(containerNodeId){
   
   </div>
   
-  <script src="_UI_canvas.js"></script>
+  <script src="UI_canvas.js"></script>
   
   <script src="MODFLOW2005.js"></script>
   
-  <script src="_RainbowVis.js"></script>
+  <script src="RainbowVis.js"></script>
   
 </body>
 </html>
