@@ -1,0 +1,494 @@
+<!doctype html>
+<html>
+<head>
+  <title>Example: Well Impact</title>
+  <style>
+  html, body {
+    width:100%;
+    height:100%;
+    padding:0px;
+    margin:0px;
+  }
+  </style>
+  
+  <script> 
+  
+var model, ui;
+var pumpingGraph, impactGraph;
+var constant2DArray = function(rows, cols, value){
+  var arr = [];
+  for (var i=0; i<rows; i++){
+    arr[i] = [];
+    for (var j=0; j<cols; j++){
+      arr[i][j] = value;
+    }
+  }
+  return arr;
+}
+var constant1DArray = function(cols, value){
+  var arr = [];
+  for (var j=0; j<cols; j++){
+    arr[j] = value;
+  }
+  return arr;
+}
+var init = function(){
+  
+  ui = new UI();
+  
+  pumpingGraph = TimeSeriesChart('pumping_graph');
+  impactGraph  = TimeSeriesChart('impact_graph'); 
+  
+  
+  setup();
+  
+  
+}
+var setup = function(){
+  
+  var rows = 60;
+  var cols = 60;
+  
+  
+  var hk    = parseFloat(document.getElementById("hk_tbx"      ).value)
+  var starting_head = parseFloat(document.getElementById("starting_head_tbx"   ).value)
+  var top_elev = parseFloat(document.getElementById("top_elev_tbx"   ).value)
+  var botm_elev = parseFloat(document.getElementById("botm_elev_tbx"   ).value)
+  var width = parseFloat(document.getElementById("width_tbx"   ).value)
+  var tstep = parseFloat(document.getElementById("timestep_tbx").value)
+  
+  console.log()
+  
+  var input_ss = { 
+    
+    "DIS":{
+      "nlay": 1,
+      "nrow": rows,
+      "ncol": cols,
+      "nper": 1,
+      "itmuni": "years",
+      "lenuni": "",
+      "delr": constant1DArray(rows, width/rows),
+      "delc": constant1DArray(cols, width/cols),
+      "elev": [
+        constant2DArray(rows, cols, top_elev) // Top
+        ,
+        constant2DArray(rows, cols, botm_elev) // Layer BOTM layer   1
+      ],
+      "periods": [
+        {
+          "perlen": tstep,          // PERLEN—is the length of a stress period
+          "nstp": 1,            // NSTP—is the number of time steps in a stress period
+          "tsmult": 1,          // TSMULT—is the multiplier for the length of successive time steps. The length of a time step is calculated by multiplying the length of the previous time step by tsmult
+          "issflg": false        // boolean variable that indicates whether the stress period is transient or steady state. True is “steady-state” and false is “transient”
+        }
+      ]
+    },
+    
+    "BAS":{
+      "ibound":[
+        constant2DArray(rows, cols, 1) // ibound, layer 1
+      ],
+      "hnoflo": 999.99,
+      "strt":[
+        constant2DArray(rows, cols, starting_head) // strt, layer 1
+      ]
+    },
+    
+    "BCF":{
+      "hdry"  : 1e30,
+      "iwdflg": false,
+      "wetfct": 0,
+      "iwetit": 0, 
+      "ihdwet": 0,
+      "layers":[
+        {
+          "layavg":0,
+          "laycon":3, // 0=confined, 1=water table, 2=limited convertable, 3= fully convertable
+          "hy": constant2DArray(rows, cols, hk),
+          "sc1":constant2DArray(rows, cols, 0.001), // 
+          "sc2":constant2DArray(rows, cols, 0.2), // 
+          "trpy": 1 // TRPY—is a one-dimensional variable containing a horizontal anisotropic factor for each layer and is the ratio of
+                      // transmissivity or hydraulic conductivity (whichever is being used) along a column to transmissivity or hydraulic
+                      // conductivity along a row. Set to 1.0 for isotropic conditions.
+        }
+      ]
+    },
+    
+    
+    "WEL": {
+      "data":[
+        [ //  Stress Period 1
+          //{"layer":3 , "row": 5 ,"column":11 , "q": -5},
+        ]
+      ]
+    },
+    "SIP":{
+      "mxiter": 50, // the maximum number of times through the iteration loop in one time step in an attempt to solve the system of finite-difference equations
+      "nparm": 5,   // the number of iteration variables to be used. Five variables are generally sufficient
+      "accl": 1,    // the acceleration variable, which must be greater than zero and is generally equal to one
+      "err": 0.001, // the head change criterion for convergence
+      "ipcalc": 0,  // flag indicating where the seed for calculating iteration variables will come from
+      "wseed": 0.001// the seed for calculating iteration variables
+    }
+    
+  };
+  
+  
+  model = new MODFLOW2005(input_ss);
+  
+   
+  try{
+    var results = model.run();
+  }
+  catch(err){
+    console.error(err)
+  }
+  
+  ui.initUI("ui", model);
+  ui.applyColorScheme(model.OUT.head[0], -50,10);
+  
+  pumpingGraph.reset();
+  impactGraph.reset();
+  
+}
+var runAStep = function(){
+  model.WEL.data[0] = [];
+  
+  // update WEL package
+  var pumpingX = parseInt( document.getElementById('pumpingX_tbx').value )
+  var pumpingY = parseInt( document.getElementById('pumpingY_tbx').value )
+  var pumpingQ = parseInt( document.getElementById('pumpingQ_tbx').value ) * 43560
+  if (!isNaN(pumpingX) &&!isNaN(pumpingY) &&!isNaN(pumpingQ) ){
+    model.WEL.data[0].push( {"layer":1 , "row": pumpingY ,"column": pumpingX , "q": pumpingQ} )
+  }
+  
+  // run a transient time step
+  model.run();
+  ui.applyColorScheme(model.OUT.head[0], -50,10);
+  
+  // get the head at the watch location:
+  var watchX = parseInt( document.getElementById('watchX_tbx').value )
+  var watchY = parseInt( document.getElementById('watchY_tbx').value )
+  var value = NaN;
+  if (!isNaN(watchX) && !isNaN(watchY)){
+    var n = (watchX-1) + (watchY-1) * model.BAS.ncol;
+    value = model.OUT.head[0][n];
+  }
+  pumpingGraph.addValue(pumpingQ / 43560)
+  impactGraph.addValue(value)
+  
+}
+var startRunnning = function(){
+  var fnt2repeat = function(){
+    runAStep();
+    startRunnning.timer = setTimeout( fnt2repeat, 100);
+  }
+  fnt2repeat();
+}
+var stopRunning = function(){
+  timerId = startRunnning.timer;
+  if (typeof timerId == "number"){
+    window.clearTimeout( timerId );
+  }
+}
+var TimeSeriesChart = function(containerNodeId){
+  
+  var containerNode = document.getElementById(containerNodeId);
+  if (typeof containerNode !== "object"){
+    throw "Could not find the specified node id of '" + containerNodeId + "'";
+  }
+  var canvas = document.createElement('canvas');
+  canvas.width = 400;
+  canvas.height = 150;
+  containerNode.appendChild(canvas);
+  var ctx = canvas.getContext("2d");
+  
+  var CONFIG = {
+    bgcolor: "white",
+    textcolor: "black",
+    lineColor: "blue",
+    posFillColor: "",
+    negFillColor: "",
+    lineWidth: 1.5
+  }
+  
+  var height = canvas.height;
+  var width = canvas.width;
+  var marginTop = 1
+  var marginBottom = 20
+  var marginLeft = 40
+  var marginRight = 1
+  
+  
+  var values = [];
+  var minvalue = null;
+  var maxvalue = null;
+  
+  var maxY = null;
+  var minY = null;
+  var maxX = null;
+  var minX = null;
+  
+  
+  // ---
+  
+  var set = function(key, value){
+    if (CONFIG.hasOwnProperty(key)){
+      CONFIG[key] = value;
+    }
+  }
+  
+  var reset = function(){
+  
+    values = [];
+    minvalue = null;
+    maxvalue = null;
+    
+    resetGraph();
+    
+  }
+  
+  var resetGraph = function(){
+    // clear everything
+    ctx.fillStyle = CONFIG.bgcolor;
+    ctx.fillRect(0, 0, width, height);
+    
+    // draw border
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 1
+    ctx.rect(marginLeft+0.5, marginTop+0.5, width-marginRight-marginLeft, height-marginBottom-marginTop);
+    ctx.stroke();
+      
+    // draw gridlines
+    if (minvalue !== null && maxvalue !== null){
+      var padding = 0.25; // 25%
+      var rangeY;
+      
+      // get min and max Y values
+      minY = minvalue;
+      maxY = maxvalue;
+      if (minY == maxY){minY-=1; maxY+=1;}
+      rangeY = maxY-minY;
+      
+      // add some padding to min and max
+      minY -= rangeY*padding;
+      maxY += rangeY*padding;
+      rangeY = maxY-minY;
+      
+      // Draw gridlines Y
+      ctx.strokeStyle = 'silver';
+      ctx.lineWidth = 1
+      var a = parseInt( (rangeY*.8).toExponential(0).split('e')[1] );
+      var pa = Math.pow(10,a);
+      for (var i = Math.ceil(minY / pa) * pa; i<maxY; i+=pa){
+        ctx.beginPath();
+        ctx.moveTo ( marginLeft , val2y( i ) );
+        ctx.lineTo ( width-marginRight , val2y( i ) );
+        ctx.stroke();
+        
+        ctx.font = "10px Arial"
+        ctx.textAlign = "right"
+        ctx.fillStyle = CONFIG.textcolor;
+        ctx.fillText(""+i, marginLeft , val2y( i ) +3)
+        
+      }
+      
+      
+      
+      
+      // Draw gridlines X
+      minX = 0
+      maxX = width-marginLeft-marginRight
+      var rangeX = maxX - minX;
+      ctx.strokeStyle = 'silver';
+      ctx.lineWidth = 0.2
+      var a = parseInt( (rangeX*.8).toExponential(0).split('e')[1] );
+      var pa = Math.pow(10,a);
+      for (var i = Math.ceil(minX / pa) * pa; i<maxX; i+=pa){
+        ctx.beginPath();
+        ctx.moveTo ( val2x(i), marginTop );
+        ctx.lineTo ( val2x(i), height-marginBottom );
+        ctx.stroke();
+        
+        
+        ctx.font = "10px Arial"
+        ctx.textAlign = "center"
+        ctx.fillStyle = CONFIG.textcolor;
+        ctx.fillText(""+i, val2x(i), height-marginBottom+11)
+        
+      }
+      
+      
+    }
+    
+    
+    
+    
+    
+    
+    // set stroke for graph trend line
+    ctx.lineWidth = CONFIG.lineWidth
+    ctx.strokeStyle = CONFIG.lineColor;
+  }
+  
+  
+  /** Convert given value to pixle y offset 
+  */
+  var val2y = function(val){
+    var remHeight = height - marginTop - marginBottom;
+    var y = Math.round( remHeight*( 1 - ( val - minY ) / ( maxY - minY ) ) )
+    if (y>remHeight) y=remHeight;
+    if (y<0) y=0;
+    return y + marginTop + 0.5; // 0.5 is so the line width is not 2px
+  }
+  
+  
+  /** Convert given value to pixle x offset 
+  */
+  var val2x = function(val){
+    var remWidth = width - marginLeft - marginRight;
+    var x = Math.round( remWidth*(  ( val - minX ) / ( maxX - minX ) ) )
+    if (x>remWidth) x=remWidth;
+    if (x<0) x=0;
+    return x + marginLeft + 0.5; // 0.5 is so the line width is not 2px
+  }
+  
+  
+  var addValue = function(newval){
+    
+    newval = parseFloat(newval);
+    var requireRedraw = false;
+    if (newval == newval){
+      if (minvalue === null || minY > newval){
+        minvalue = newval;
+        requireRedraw = true
+      }
+      if (maxvalue === null || maxY < newval){
+        maxvalue = newval;
+        requireRedraw = true;
+      }
+    }
+    
+    values.push(newval)
+    if (requireRedraw){
+      resetGraph();
+      drawAllValues();
+    }
+    else{
+      drawLastValue();
+    }
+  }
+  
+  var drawLastValue = function(){
+    var arrlen = values.length
+    if ( arrlen >= 2){
+      if (CONFIG.lineColor && CONFIG.lineWidth){
+        ctx.beginPath();
+        ctx.moveTo ( val2x(arrlen-2) , val2y( values[arrlen-2] ) );
+        ctx.lineTo ( val2x(arrlen-1) , val2y( values[arrlen-1] ) );
+        ctx.stroke();
+      }
+      if (CONFIG.posFillColor){
+        ctx.fillStyle = CONFIG.posFillColor;
+        if ( values[arrlen-1] < 0 ){
+          ctx.fillStyle = CONFIG.negFillColor;
+        }
+        ctx.beginPath();
+        ctx.moveTo ( val2x(arrlen-2) , val2y( values[arrlen-2] ) );
+        ctx.lineTo ( val2x(arrlen-1) , val2y( values[arrlen-1] ) );
+        ctx.lineTo ( val2x(arrlen-1) , val2y(0) );
+        ctx.lineTo ( val2x(arrlen-2) , val2y(0) );
+        ctx.closePath()
+        ctx.fill();
+      }
+      
+    }
+  }
+  
+  var drawAllValues = function(){
+    
+    var valuesCopy = values.slice();
+    values = [];
+    for (var i=0; i<valuesCopy.length; i++){
+      values.push( valuesCopy[i] );
+      drawLastValue();
+    }
+    
+    // var arrlen = values.length;
+    // 
+    // ctx.beginPath();
+    // if(arrlen > 0){
+    //   ctx.moveTo ( 0 , val2y( values[0] ) );
+    // }
+    // for (var i=1; i<arrlen; i++){
+    //   ctx.lineTo ( i , val2y( values[i] ) );
+    // }
+    // ctx.stroke();
+  }
+  
+  return {
+    reset: reset,
+    addValue: addValue,
+    set: set
+  }
+  
+}
+  </script>
+  
+</head>
+<body onload="init();" style="width:20000px;">
+  
+  <h2>Model Setup</h2>
+  <div>Hydraulic Conductivity (ft/yr) = <input id="hk_tbx" value="1000" style="width:40px;" /></div>
+  <div>Starting Head Elev. (ft)= <input id="starting_head_tbx" value="0" style="width:40px;" /></div>
+  <div>Aquifer Top Elev. (ft)= <input id="top_elev_tbx" value="100" style="width:40px;" /></div>
+  <div>Aquifer Bottom Elev. (ft)= <input id="botm_elev_tbx" value="-1000" style="width:40px;" /></div>
+  <div>Aquifer Lateral Width (ft) = <input id="width_tbx" value="52800" style="width:40px;" /></div>
+  <div>Simulation Time Step (yr) = <input id="timestep_tbx" value="0.1" style="width:40px;" /></div>
+  
+  <div>
+    <input type="button" value="Reset" onclick="setup();"/>
+  </div>
+  
+  <div>
+    
+    <div id="ui" style="width:500px; height:500px; float:left;"></div>
+    
+    
+    <div style="">
+      <button onclick="startRunnning()">Start</button>
+      <button onclick="stopRunning()">Stop</button>
+      
+      <!--
+      <h3>Aquifer:</h3>
+      box width: <input id="boxWidth_tbx" type="text" value=30 style="width:40px;"/>,
+      hyd conductivity: <input id="HK_tbx" type="text" value=30 style="width:40px;"/>,
+      storativity?: <input id="SS_tbx" type="text" value=-100 style="width:40px;"/>
+      -->
+      
+      <h3>Pumping Well:</h3>
+      X: <input id="pumpingX_tbx" type="text" value=30 style="width:40px;"/>,
+      Y: <input id="pumpingY_tbx" type="text" value=30 style="width:40px;"/>,
+      Q: <input id="pumpingQ_tbx" type="text" value=-100 style="width:40px;"/>
+      
+      <h3>Watch Water Levels At:</h3>
+      X: <input id="watchX_tbx" type="text" value=40  style="width:40px;"/>,
+      Y: <input id="watchY_tbx" type="text" value=30  style="width:40px;"/>
+      
+      <div id="pumping_graph"></div>
+      <div id="impact_graph"></div>
+      
+    </div>
+    
+  
+  </div>
+  
+  <script src="UI_canvas.js"></script>
+  
+  <script src="MODFLOW2005.js"></script>
+  
+  <script src="RainbowVis.js"></script>
+  
+</body>
+</html>
