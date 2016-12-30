@@ -2967,281 +2967,16 @@ var MODFLOW2005 = function( input ){
   }());
   
   var EVT = (function(){ // V!
-    var EVT = {};
-    EVT.nevtop = 0 // must be 1 or 2 or 3, indicating whether to use the top layer or a specified layer or the top active layer for each location
-    EVT.surf = []; 
-    EVT.evtr = []; // this is modified, multiplied by the cell area
-    EVT.exdp = []; 
-    EVT.ievt = []; 
-    
-    EVT.AllocateRead = function(input){
-      
-      
-      EVT.nevtop = input.EVT.nevtop;
-      
-      
-      EVT.surf = input.EVT.surf;
-      EVT.evtr = input.EVT.evtr;
-      EVT.exdp = input.EVT.exdp;
-      EVT.ievt = input.EVT.ievt;
-      
-      // Some validation
-      //
-      var v;
-      
-      if ((v = checkIfInt(EVT.nevtop)) != "ok")
-        badinput("Problem with EVT.nevtop -- " + v);
-      if ( EVT.nevtop != 1 && EVT.nevtop != 2 && EVT.nevtop != 3){
-        badinput("Problem with EVT.nevtop -- Must be 1 (calculated for top layer) or 2 (layer specified by EVT.ievt) or 3 (top active layer).");
-      }
-      
-      
-      if ((v = checkIfArray(EVT.surf, BAS.periods.length)) != "ok")
-        badinput("Problem with EVT.surf -- " + v);
-      if ((v = checkIfArray(EVT.evtr, BAS.periods.length)) != "ok")
-        badinput("Problem with EVT.evtr -- " + v);
-      if ((v = checkIfArray(EVT.exdp, BAS.periods.length)) != "ok")
-        badinput("Problem with EVT.exdp -- " + v);
-      if ((v = checkIfArray(EVT.ievt, BAS.periods.length)) != "ok" && EVT.nevtop == 2 )
-        badinput("Problem with EVT.ievt -- " + v);
-      
-      for (var p=0; p<EVT.surf.length; p++){
-        if ((v = checkIfArray(EVT.surf[p])) != "ok")
-          badinput("Problem with EVT.surf["+p+"] -- " + v);
-        for (var a=0; a<EVT.surf[p].length; a++){
-          if ((v = checkIfArray(EVT.surf[p], BAS.nrow)) != "ok")
-            badinput("Problem with EVT.surf["+p+"] -- " + v);
-          for (var i=0; i<EVT.surf[p].length; i++){
-            if ((v = checkIfArray(EVT.surf[p][i], BAS.ncol)) != "ok")
-              badinput("Problem with EVT.surf["+p+"]["+i+"] -- " + v); 
-            for (var j=0; j<EVT.surf[p][i].length; j++){
-              if ((v = checkIfNumber(EVT.surf[p][i][j])) != "ok")
-                badinput("Problem with EVT.surf["+p+"]["+i+"]["+j+"] -- " + v);
-            }
-          }
-        }
-      }
-      
-      for (var p=0; p<EVT.evtr.length; p++){
-        if ((v = checkIfArray(EVT.evtr[p])) != "ok")
-          badinput("Problem with EVT.evtr["+p+"] -- " + v);
-        for (var a=0; a<EVT.evtr[p].length; a++){
-          if ((v = checkIfArray(EVT.evtr[p], BAS.nrow)) != "ok")
-            badinput("Problem with EVT.evtr["+p+"] -- " + v);
-          for (var i=0; i<EVT.evtr[p].length; i++){
-            if ((v = checkIfArray(EVT.evtr[p][i], BAS.ncol)) != "ok")
-              badinput("Problem with EVT.evtr["+p+"]["+i+"] -- " + v); 
-            for (var j=0; j<EVT.evtr[p][i].length; j++){
-              if ((v = checkIfNumber(EVT.evtr[p][i][j])) != "ok")
-                badinput("Problem with EVT.evtr["+p+"]["+i+"]["+j+"] -- " + v);
-            }
-          }
-        }
-      }
-      
-      for (var p=0; p<EVT.exdp.length; p++){
-        if ((v = checkIfArray(EVT.exdp[p])) != "ok")
-          badinput("Problem with EVT.exdp["+p+"] -- " + v);
-        for (var a=0; a<EVT.exdp[p].length; a++){
-          if ((v = checkIfArray(EVT.exdp[p], BAS.nrow)) != "ok")
-            badinput("Problem with EVT.exdp["+p+"] -- " + v);
-          for (var i=0; i<EVT.exdp[p].length; i++){
-            if ((v = checkIfArray(EVT.exdp[p][i], BAS.ncol)) != "ok")
-              badinput("Problem with EVT.exdp["+p+"]["+i+"] -- " + v); 
-            for (var j=0; j<EVT.exdp[p][i].length; j++){
-              if ((v = checkIfNumber(EVT.exdp[p][i][j])) != "ok")
-                badinput("Problem with EVT.exdp["+p+"]["+i+"]["+j+"] -- " + v);
-            }
-          }
-        }
-      }
-      
-      if ( EVT.nevtop == 2 ){
-        for (var p=0; p<EVT.ievt.length; p++){
-          if ((v = checkIfArray(EVT.ievt[p])) != "ok")
-            badinput("Problem with EVT.ievt["+p+"] -- " + v);
-          for (var a=0; a<EVT.ievt[p].length; a++){
-            if ((v = checkIfArray(EVT.ievt[p], BAS.nrow)) != "ok")
-              badinput("Problem with EVT.ievt["+p+"] -- " + v);
-            for (var i=0; i<EVT.ievt[p].length; i++){
-              if ((v = checkIfArray(EVT.ievt[p][i], BAS.ncol)) != "ok")
-                badinput("Problem with EVT.ievt["+p+"]["+i+"] -- " + v); 
-              for (var j=0; j<EVT.ievt[p][i].length; j++){
-                if ((v = checkIfNumber(EVT.ievt[p][i][j])) != "ok")
-                  badinput("Problem with EVT.ievt["+p+"]["+i+"]["+j+"] -- " + v);
-              }
-            }
-          }
-        }
-      }
-      
-      
-    }
-    EVT.ReadPrepare = function(kper){
-      
-      // C5 - MULTIPLY MAX ET RATE BY CELL AREA TO GET VOLUMETRIC RATE
-      for (var ir=0; ir<BAS.nrow; ir++){
-        for (var ic=0; ic<BAS.ncol; ic++){
-          EVT.evtr[kper][ir][ic] = EVT.evtr[kper][ir][ic] * BAS.delr[ic]*BAS.delc[ir];
-        }
-      }
-      
-    }
-    EVT.Formulate = function(kiter, kstp, kper){
-      
-      // C2 - PROCESS EACH HORIZONTAL CELL LOCATION
-      for (var ir=0; ir<BAS.nrow; ir++){
-        for (var ic=0; ic<BAS.ncol; ic++){
-          
-          // C3 - SET THE LAYER INDEX -- FOR OPTION 1, THE LAYER IS 1;
-          // C3 - FOR OPTION 2, THE LAYER IS SPECIFIED IN IEVT.
-          var il;
-          if (EVT.nevtop == 1){
-             il=0
-          }
-          else if(EVT.nevtop == 2){
-             il = EVT.ievt[kper][ir][ic] - 1;
-             if (il < 0) continue;
-          }
-          else{
-            //C4 - FOR OPTION 3, FIND UPPERMOST ACTIVE CELL.
-            il=0;
-            for (var k=0; k<BAS.nlay; k++){
-              if(BAS.ibound[k][ir][ic] !== 0){
-                il = k;
-                break;
-              }
-            }
-          }
-          
-          
-          // C5 - IF THE CELL IS NOT VARIABLE HEAD, IGNORE IT.  IF CELL IS
-          // C5 - VARIABLE HEAD, GET DATA NEEDED TO COMPUTE FLOW TERMS.
-          if(BAS.ibound[il][ir][ic] > 0){
-            var c = EVT.evtr[kper][ir][ic];
-            var s = EVT.surf[kper][ir][ic];
-            var hh = BAS.hnew[il][ir][ic];
-            
-            
-            
-            // C6 - IF AQUIFER HEAD IS GREATER THAN OR EQUAL TO SURF, ET IS CONSTANT
-            if(hh >= s){
-              
-              // C6A - HEAD IS GREATER THAN OR EQUAL TO SURF.  ADD EVTR TO RHS
-              BAS.rhs[il][ir][ic] += c;
-              
-            }
-            else{
-              
-              // C7 - IF DEPTH TO WATER>=EXTINCTION DEPTH, THEN ET IS 0.
-              var dd = s-hh;
-              var x = EVT.exdp[kper][ir][ic];
-              if(dd < x){
-                
-                // C8 - LINEAR RANGE. ADD ET TERMS TO BOTH RHS AND HCOF.
-                BAS.rhs[il][ir][ic] += c-c*s/x;
-                BAS.hcof[il][ir][ic] -= c/x;
-                
-              }
-            }
-          }
-          
-        }
-        
-      }
-      
-    }
-    EVT.WaterBudget = function(kstp, kper){
-      
-      var t = BAS.tstp;
-      
-      var ncel = BAS.nrow * BAS.ncol * BAS.nlay;
-      OUT.ccFlow [t]["EVT"] = new Float32Array(ncel);
-      OUT.vbSumIn [t]["EVT"] = 0;  
-      OUT.vbSumOut [t]["EVT"] = 0;
-      
-      // C4 - PROCESS EACH HORIZONTAL CELL LOCATION.
-      var n=0;
-      for (var ir=0; ir<BAS.nrow; ir++){
-        for (var ic=0; ic<BAS.ncol; ic++,n++){
-          
-          // C5 - SET THE LAYER INDEX -- FOR OPTION 1, THE LAYER IS 1;
-          // C5 - FOR OPTION 2, THE LAYER IS SPECIFIED IN IEVT.
-          var il;
-          if (EVT.nevtop == 1){
-             il=0
-          }
-          else if(EVT.nevtop == 2){
-             il = EVT.ievt[kper][ir][ic] - 1;
-             if (il <= 0) continue;
-          }
-          else{
-            //C6 - FOR OPTION 3, FIND UPPERMOST ACTIVE CELL.
-            il=0;
-            for (var k=0; k<BAS.nlay; k++){
-              if(BAS.ibound[k][ir][ic] !== 0){
-                il = k;
-                break;
-              }
-            }
-          }
-          
-          var q=0;
-          
-          // C7 - IF CELL IS EXTERNAL THEN IGNORE IT.
-          if(BAS.ibound[il][ir][ic] > 0){
-            var c = EVT.evtr[kper][ir][ic];
-            var s = EVT.surf[kper][ir][ic];
-            var hh = BAS.hnew[il][ir][ic];
-            
-            // C8 - IF AQUIFER HEAD => SURF,SET Q=MAX ET RATE.
-            if(hh >= s){
-              q = -c;
-            }
-            else{
-              
-              // C9 - IF DEPTH=>EXTINCTION DEPTH, ET IS 0.
-              var dd = s-hh;
-              var x = EVT.exdp[kper][ir][ic];
-              if(dd < x){
 
-                // C10 - LINEAR RANGE. Q= -HNEW*EVTR/EXDP -EVTR + EVTR*SURF/EXDP.
-                var hhcof = -c/x;
-                var rrhs = (c*s/x)-c;
-                q = hh*hhcof+rrhs;
-                
-              }
-            }
-          }
-          
-          OUT.ccFlow [t]["EVT"][n + il*(BAS.nrow*BAS.ncol)] = q;
-          if (q>0){
-            OUT.vbSumIn [t]["EVT"]+=q;
-          }
-          else{
-            OUT.vbSumOut [t]["EVT"]-=q;
-          }
-          
-        }
-      }
-      
-      
-      OUT.vbSumIn [t]["EVT"] *= BAS.delt;  
-      OUT.vbSumOut [t]["EVT"] *= BAS.delt;
-    
-    }
-    EVT.Output = function(){}
-    EVT.DeallocateMemory = function(){}
-    
-    return EVT;
-  }());
-  
-  var GHB = (function(){ // V!
-        
-	  var data = {
-      bounds: []
+    var data = {
+      nevtop: 0,   // must be 1 or 2 or 3, indicating whether to use the top layer or a specified layer or the top active layer for each location
+      surf: [], 
+      evtr: [],    // this is modified, multiplied by the cell area
+      exdp: [], 
+      ievt: []
     };
     
+    /** Allow the data used by this package to be accessed by other packages or external code */
     var getData = function(key){
       // If the key argument was not provided, return all the data
       if (typeof key == "undefined"){
@@ -3255,7 +2990,324 @@ var MODFLOW2005 = function( input ){
       throw "Could not find item "+ key +" in the GHB package";
     }
     
+    /** Allow the data used by this package to be set by other packages or external code */
+    var setData = function(key, value){
+      
+      var v;
+      
+      if (key == "nevtop"){
+        data.nevtop = input.EVT.nevtop;
+        
+        if ((v = checkIfInt(data.nevtop)) != "ok")
+          badinput("Problem with EVT.nevtop -- " + v);
+        if ( data.nevtop != 1 && data.nevtop != 2 && data.nevtop != 3){
+          badinput("Problem with EVT.nevtop -- Must be 1 (calculated for top layer) or 2 (layer specified by EVT.ievt) or 3 (top active layer).");
+        }
+        
+      }
+      
+      if (key == "surf"){
+        data.surf = input.EVT.surf;
+        if ((v = checkIfArray(data.surf, BAS.periods.length)) != "ok")
+          badinput("Problem with EVT.surf -- " + v);
+        
+        for (var p=0; p<data.surf.length; p++){
+          if ((v = checkIfArray(data.surf[p])) != "ok")
+            badinput("Problem with EVT.surf["+p+"] -- " + v);
+          for (var a=0; a<data.surf[p].length; a++){
+            if ((v = checkIfArray(data.surf[p], BAS.nrow)) != "ok")
+              badinput("Problem with EVT.surf["+p+"] -- " + v);
+            for (var i=0; i<data.surf[p].length; i++){
+              if ((v = checkIfArray(data.surf[p][i], BAS.ncol)) != "ok")
+                badinput("Problem with EVT.surf["+p+"]["+i+"] -- " + v); 
+              for (var j=0; j<data.surf[p][i].length; j++){
+                if ((v = checkIfNumber(data.surf[p][i][j])) != "ok")
+                  badinput("Problem with EVT.surf["+p+"]["+i+"]["+j+"] -- " + v);
+              }
+            }
+          }
+        }
+        
+      }
+      
+      if (key == "evtr"){
+        data.evtr = input.EVT.evtr;
+        if ((v = checkIfArray(data.evtr, BAS.periods.length)) != "ok")
+          badinput("Problem with EVT.evtr -- " + v);
+        
+        for (var p=0; p<data.evtr.length; p++){
+          if ((v = checkIfArray(data.evtr[p])) != "ok")
+            badinput("Problem with EVT.evtr["+p+"] -- " + v);
+          for (var a=0; a<data.evtr[p].length; a++){
+            if ((v = checkIfArray(data.evtr[p], BAS.nrow)) != "ok")
+              badinput("Problem with EVT.evtr["+p+"] -- " + v);
+            for (var i=0; i<data.evtr[p].length; i++){
+              if ((v = checkIfArray(data.evtr[p][i], BAS.ncol)) != "ok")
+                badinput("Problem with EVT.evtr["+p+"]["+i+"] -- " + v); 
+              for (var j=0; j<data.evtr[p][i].length; j++){
+                if ((v = checkIfNumber(data.evtr[p][i][j])) != "ok")
+                  badinput("Problem with EVT.evtr["+p+"]["+i+"]["+j+"] -- " + v);
+              }
+            }
+          }
+        }
+        
+      }
+      
+      if (key == "exdp"){
+        data.exdp = input.EVT.exdp;
+        if ((v = checkIfArray(data.exdp, BAS.periods.length)) != "ok")
+          badinput("Problem with EVT.exdp -- " + v);
+        
+        for (var p=0; p<data.exdp.length; p++){
+          if ((v = checkIfArray(data.exdp[p])) != "ok")
+            badinput("Problem with EVT.exdp["+p+"] -- " + v);
+          for (var a=0; a<data.exdp[p].length; a++){
+            if ((v = checkIfArray(data.exdp[p], BAS.nrow)) != "ok")
+              badinput("Problem with EVT.exdp["+p+"] -- " + v);
+            for (var i=0; i<data.exdp[p].length; i++){
+              if ((v = checkIfArray(data.exdp[p][i], BAS.ncol)) != "ok")
+                badinput("Problem with EVT.exdp["+p+"]["+i+"] -- " + v); 
+              for (var j=0; j<data.exdp[p][i].length; j++){
+                if ((v = checkIfNumber(data.exdp[p][i][j])) != "ok")
+                  badinput("Problem with EVT.exdp["+p+"]["+i+"]["+j+"] -- " + v);
+              }
+            }
+          }
+        }
+        
+      } 
+      
+      if (key == "ievt"){
+        data.ievt = input.EVT.ievt;
+        if ((v = checkIfArray(data.ievt, BAS.periods.length)) != "ok" && data.nevtop == 2 )
+          badinput("Problem with EVT.ievt -- " + v);
+        
+        if ( data.nevtop == 2 ){
+          for (var p=0; p<data.ievt.length; p++){
+            if ((v = checkIfArray(data.ievt[p])) != "ok")
+              badinput("Problem with EVT.ievt["+p+"] -- " + v);
+            for (var a=0; a<data.ievt[p].length; a++){
+              if ((v = checkIfArray(data.ievt[p], BAS.nrow)) != "ok")
+                badinput("Problem with EVT.ievt["+p+"] -- " + v);
+              for (var i=0; i<data.ievt[p].length; i++){
+                if ((v = checkIfArray(data.ievt[p][i], BAS.ncol)) != "ok")
+                  badinput("Problem with EVT.ievt["+p+"]["+i+"] -- " + v); 
+                for (var j=0; j<data.ievt[p][i].length; j++){
+                  if ((v = checkIfNumber(data.ievt[p][i][j])) != "ok")
+                    badinput("Problem with EVT.ievt["+p+"]["+i+"]["+j+"] -- " + v);
+                }
+              }
+            }
+          }
+        }
+        
+      }
+      
+    }
     
+    return {
+      get: getData,
+      set: setData,
+      subroutines: {
+    
+        "AllocateRead" : function(input){
+          
+          setData("nevtop", input.EVT.nevtop)
+          setData("surf", input.EVT.surf)
+          setData("evtr", input.EVT.evtr)
+          setData("exdp", input.EVT.exdp)
+          setData("ievt", input.EVT.ievt)
+          
+          
+        }
+        ,
+        "ReadPrepare" : function(kper){
+          
+          // C5 - MULTIPLY MAX ET RATE BY CELL AREA TO GET VOLUMETRIC RATE
+          for (var ir=0; ir<BAS.nrow; ir++){
+            for (var ic=0; ic<BAS.ncol; ic++){
+              data.evtr[kper][ir][ic] = data.evtr[kper][ir][ic] * BAS.delr[ic]*BAS.delc[ir];
+            }
+          }
+          
+        }
+        ,
+        "Formulate" : function(kiter, kstp, kper){
+          
+          // C2 - PROCESS EACH HORIZONTAL CELL LOCATION
+          for (var ir=0; ir<BAS.nrow; ir++){
+            for (var ic=0; ic<BAS.ncol; ic++){
+              
+              // C3 - SET THE LAYER INDEX -- FOR OPTION 1, THE LAYER IS 1;
+              // C3 - FOR OPTION 2, THE LAYER IS SPECIFIED IN IEVT.
+              var il;
+              if (data.nevtop == 1){
+                 il=0
+              }
+              else if(data.nevtop == 2){
+                 il = data.ievt[kper][ir][ic] - 1;
+                 if (il < 0) continue;
+              }
+              else{
+                //C4 - FOR OPTION 3, FIND UPPERMOST ACTIVE CELL.
+                il=0;
+                for (var k=0; k<BAS.nlay; k++){
+                  if(BAS.ibound[k][ir][ic] !== 0){
+                    il = k;
+                    break;
+                  }
+                }
+              }
+              
+              
+              // C5 - IF THE CELL IS NOT VARIABLE HEAD, IGNORE IT.  IF CELL IS
+              // C5 - VARIABLE HEAD, GET DATA NEEDED TO COMPUTE FLOW TERMS.
+              if(BAS.ibound[il][ir][ic] > 0){
+                var c = data.evtr[kper][ir][ic];
+                var s = data.surf[kper][ir][ic];
+                var hh = BAS.hnew[il][ir][ic];
+                
+                
+                
+                // C6 - IF AQUIFER HEAD IS GREATER THAN OR EQUAL TO SURF, ET IS CONSTANT
+                if(hh >= s){
+                  
+                  // C6A - HEAD IS GREATER THAN OR EQUAL TO SURF.  ADD EVTR TO RHS
+                  BAS.rhs[il][ir][ic] += c;
+                  
+                }
+                else{
+                  
+                  // C7 - IF DEPTH TO WATER>=EXTINCTION DEPTH, THEN ET IS 0.
+                  var dd = s-hh;
+                  var x = data.exdp[kper][ir][ic];
+                  if(dd < x){
+                    
+                    // C8 - LINEAR RANGE. ADD ET TERMS TO BOTH RHS AND HCOF.
+                    BAS.rhs[il][ir][ic] += c-c*s/x;
+                    BAS.hcof[il][ir][ic] -= c/x;
+                    
+                  }
+                }
+              }
+              
+            }
+            
+          }
+          
+        }
+        ,
+        "WaterBudget" : function(kstp, kper){
+          
+          var t = BAS.tstp;
+          
+          var ncel = BAS.nrow * BAS.ncol * BAS.nlay;
+          OUT.ccFlow [t]["EVT"] = new Float32Array(ncel);
+          OUT.vbSumIn [t]["EVT"] = 0;  
+          OUT.vbSumOut [t]["EVT"] = 0;
+          
+          // C4 - PROCESS EACH HORIZONTAL CELL LOCATION.
+          var n=0;
+          for (var ir=0; ir<BAS.nrow; ir++){
+            for (var ic=0; ic<BAS.ncol; ic++,n++){
+              
+              // C5 - SET THE LAYER INDEX -- FOR OPTION 1, THE LAYER IS 1;
+              // C5 - FOR OPTION 2, THE LAYER IS SPECIFIED IN IEVT.
+              var il;
+              if (data.nevtop == 1){
+                 il=0
+              }
+              else if(data.nevtop == 2){
+                 il = data.ievt[kper][ir][ic] - 1;
+                 if (il <= 0) continue;
+              }
+              else{
+                //C6 - FOR OPTION 3, FIND UPPERMOST ACTIVE CELL.
+                il=0;
+                for (var k=0; k<BAS.nlay; k++){
+                  if(BAS.ibound[k][ir][ic] !== 0){
+                    il = k;
+                    break;
+                  }
+                }
+              }
+              
+              var q=0;
+              
+              // C7 - IF CELL IS EXTERNAL THEN IGNORE IT.
+              if(BAS.ibound[il][ir][ic] > 0){
+                var c = data.evtr[kper][ir][ic];
+                var s = data.surf[kper][ir][ic];
+                var hh = BAS.hnew[il][ir][ic];
+                
+                // C8 - IF AQUIFER HEAD => SURF,SET Q=MAX ET RATE.
+                if(hh >= s){
+                  q = -c;
+                }
+                else{
+                  
+                  // C9 - IF DEPTH=>EXTINCTION DEPTH, ET IS 0.
+                  var dd = s-hh;
+                  var x = data.exdp[kper][ir][ic];
+                  if(dd < x){
+    
+                    // C10 - LINEAR RANGE. Q= -HNEW*EVTR/EXDP -EVTR + EVTR*SURF/EXDP.
+                    var hhcof = -c/x;
+                    var rrhs = (c*s/x)-c;
+                    q = hh*hhcof+rrhs;
+                    
+                  }
+                }
+              }
+              
+              OUT.ccFlow [t]["EVT"][n + il*(BAS.nrow*BAS.ncol)] = q;
+              if (q>0){
+                OUT.vbSumIn [t]["EVT"]+=q;
+              }
+              else{
+                OUT.vbSumOut [t]["EVT"]-=q;
+              }
+              
+            }
+          }
+          
+          
+          OUT.vbSumIn [t]["EVT"] *= BAS.delt;  
+          OUT.vbSumOut [t]["EVT"] *= BAS.delt;
+        
+        }
+        ,
+        "Output" : function(){}
+        ,
+        "DeallocateMemory" : function(){}
+    
+      }
+    } // end return
+    
+  }());
+  
+  var GHB = (function(){ // V!
+    
+    var data = {
+      bounds: []
+    };
+    
+    /** Allow the data used by this package to be accessed by other packages or external code */
+    var getData = function(key){
+      // If the key argument was not provided, return all the data
+      if (typeof key == "undefined"){
+        return data;
+      }
+      // If a valid key argument was provided, return the desired data
+      if (data.hasOwnProperty(key)){
+        return data[key];
+      }
+      // If neither of the above, throw an error
+      throw "Could not find item "+ key +" in the GHB package";
+    }
+    
+    /** Allow the data used by this package to be set by other packages or external code */
     var setData = function(key, value){
       
       if (key == "bounds"){
@@ -3427,8 +3479,7 @@ var MODFLOW2005 = function( input ){
   
   
   
-  
-	var run = function(){
+  var run = function(){
     
     var start_time = (new Date).getTime();
     
@@ -3439,56 +3490,53 @@ var MODFLOW2005 = function( input ){
     BAS.tstp=0;  // keeps track of the absolute time step, not the time step of the current stress perios
     var NCVGERR = 0; // flag that is set to 1 if does not converge
     
-		// SIMULATE EACH STRESS PERIOD.
-		for( var kper = 0; kper < BAS.nper; kper++){
-
-			BAS.Stress( kper )
-			
+    // SIMULATE EACH STRESS PERIOD.
+    for( var kper = 0; kper < BAS.nper; kper++){
+      
+      BAS.Stress( kper )
       
       // Read and Prepare
       if (input.RCH){ RCH.ReadPrepare(kper); }
-      if (input.EVT){ EVT.ReadPrepare(kper); }
+      if (input.EVT){ EVT.subroutines.ReadPrepare(kper); }
       
       
-			// SIMULATE EACH TIME STEP.
+      // SIMULATE EACH TIME STEP.
       BAS.icnvg = false; // has not converged
       
-			for (var kstp = 0; kstp< BAS.periods[kper].nstp; kstp++, BAS.tstp++ ){
-				
+      for (var kstp = 0; kstp< BAS.periods[kper].nstp; kstp++, BAS.tstp++ ){
         
-        
-				BAS.AdvanceTime( kper, kstp );
-				if (input.BCF){ BCF.AdvanceTime( kper, kstp ); }
-				OUT.Write(' Solving:  Stress period: ' + kper + ', Time step: '+ kstp +', Ground-Water Flow Eqn.')
+        BAS.AdvanceTime( kper, kstp );
+        if (input.BCF){ BCF.AdvanceTime( kper, kstp ); }
+        OUT.Write(' Solving:  Stress period: ' + kper + ', Time step: '+ kstp +', Ground-Water Flow Eqn.')
 
 				
-				//ITERATIVELY FORMULATE AND SOLVE THE FLOW EQUATIONS.
-				for (var kiter=0; kiter<BAS.mxiter; kiter++){
+        //ITERATIVELY FORMULATE AND SOLVE THE FLOW EQUATIONS.
+        for (var kiter=0; kiter<BAS.mxiter; kiter++){
 
-					//FORMULATE THE FINITE DIFFERENCE EQUATIONS.
-					BAS.Formulate(kiter, kstp, kper);
-					if (input.BCF){ BCF.Formulate(kiter, kstp, kper); }
-					if (input.WEL){ WEL.Formulate(kiter, kstp, kper); }
-					if (input.DRN){ DRN.Formulate(kiter, kstp, kper); }
-					if (input.RIV){ RIV.Formulate(kiter, kstp, kper); }
-					if (input.RCH){ RCH.Formulate(kiter, kstp, kper); }
-					if (input.EVT){ EVT.Formulate(kiter, kstp, kper); }
-					if (input.GHB){ GHB.subroutines.Formulate(kiter, kstp, kper); }
+          //FORMULATE THE FINITE DIFFERENCE EQUATIONS.
+          BAS.Formulate(kiter, kstp, kper);
+          if (input.BCF){ BCF.Formulate(kiter, kstp, kper); }
+          if (input.WEL){ WEL.Formulate(kiter, kstp, kper); }
+          if (input.DRN){ DRN.Formulate(kiter, kstp, kper); }
+          if (input.RIV){ RIV.Formulate(kiter, kstp, kper); }
+          if (input.RCH){ RCH.Formulate(kiter, kstp, kper); }
+          if (input.EVT){ EVT.subroutines.Formulate(kiter, kstp, kper); }
+          if (input.GHB){ GHB.subroutines.Formulate(kiter, kstp, kper); }
           
           // C7C2B---MAKE ONE CUT AT AN APPROXIMATE SOLUTION.
           BAS.ierr = 0;
           if (input.SIP){ SIP.Approximate(kiter, kstp, kper); }
           
           
-					if (BAS.ierr == 1){
-						throw ("");
-					}
-					// IF CONVERGENCE CRITERION HAS BEEN MET STOP ITERATING.
-					if (BAS.icnvg == true){ 
-						kiter = BAS.mxiter;
-					}
+          if (BAS.ierr == 1){
+            throw ("");
+          }
+          // IF CONVERGENCE CRITERION HAS BEEN MET STOP ITERATING.
+          if (BAS.icnvg == true){ 
+            kiter = BAS.mxiter;
+          }
           
-				}
+        }
         
         // DETERMINE WHICH OUTPUT IS NEEDED.
         BAS.OutputControl();
@@ -3499,10 +3547,10 @@ var MODFLOW2005 = function( input ){
         if (input.DRN){ DRN.WaterBudget(kstp, kper); }
         if (input.RIV){ RIV.WaterBudget(kstp, kper); }
         if (input.RCH){ RCH.WaterBudget(kstp, kper); }
-        if (input.EVT){ EVT.WaterBudget(kstp, kper); }
+        if (input.EVT){ EVT.subroutines.WaterBudget(kstp, kper); }
         if (input.GHB){ GHB.subroutines.WaterBudget(kstp, kper); }
         
-				BCF.Output(kstp, kper);
+        BCF.Output(kstp, kper);
         BAS.Output(kstp, kper);
         
         
@@ -3524,45 +3572,45 @@ var MODFLOW2005 = function( input ){
         }
         
         
-			}
+      }
       
       
       
 
-		} // END OF TIME STEP (kstp) AND STRESS PERIOD (kper) LOOPS
+    } // END OF TIME STEP (kstp) AND STRESS PERIOD (kper) LOOPS
 		
-		BAS.DeallocateMemory();
+    BAS.DeallocateMemory();
 		
 		
-  	// END OF PROGRAM.
-  	if (NCVGERR > 0){
-  		OUT.Write('FAILED TO MEET SOLVER CONVERGENCE CRITERIA');
-  	}
-  	else{
+    // END OF PROGRAM.
+    if (NCVGERR > 0){
+      OUT.Write('FAILED TO MEET SOLVER CONVERGENCE CRITERIA');
+    }
+    else{
       var end_time = (new Date).getTime();
       var run_time = end_time - start_time;
-  		OUT.Write('NORMAL TERMINATION OF SIMULATION');
-  		OUT.Write('RUN TIME: ' + run_time/1000 + " sec.");
-  	}
+      OUT.Write('NORMAL TERMINATION OF SIMULATION');
+      OUT.Write('RUN TIME: ' + run_time/1000 + " sec.");
+    }
     
     
     
-	}
+  }
 
   
   var run_init = function(){
     
     OUT.Init();
     
-		// ALLOCATE AND READ (AR) PROCEDURE
-		BAS.AllocateRead(input);
+    // ALLOCATE AND READ (AR) PROCEDURE
+    BAS.AllocateRead(input);
     if (input.BCF){ BCF.AllocateRead(input); }
     if (input.WEL){ WEL.AllocateRead(input); }
     if (input.DRN){ DRN.AllocateRead(input); }
     if (input.RCH){ RCH.AllocateRead(input); }
     if (input.RIV){ RIV.AllocateRead(input); }
     if (input.SIP){ SIP.AllocateRead(input); }
-    if (input.EVT){ EVT.AllocateRead(input); }
+    if (input.EVT){ EVT.subroutines.AllocateRead(input); }
     if (input.GHB){ GHB.subroutines.AllocateRead(input); }
     
     return true;
@@ -3571,7 +3619,7 @@ var MODFLOW2005 = function( input ){
   
   run_init();
   
-	return {
+  return {
     run: run,
     BAS: BAS,
     BCF: BCF,
