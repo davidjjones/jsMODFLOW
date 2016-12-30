@@ -18,9 +18,26 @@ This version partially supports the following MODFLOW modules. Parameterization 
 #### GHB (General-Head Boundary)
 Parameters are not supported. The package is enabled if the model input object includes a 'GHB' attribute. This attribute should contain an array with an item for each stress period. Each stress period item is an array of objects describing each general-head boundary condition.
 
-<
-Layer Row Column Bhead  Cond
->
+```
+{ ...
+
+"GHB":[
+  // Stress Period #1:
+  [
+    {"layer":1, "row":30, "column":20, "bhead":200, "cond":0.01 }, 
+    {"layer":1, "row":30, "column":21, "bhead":200, "cond":0.01 }
+  ], 
+  
+  // Stress Period #2:
+  [
+    {"layer":1, "row":30, "column":20, "bhead":200, "cond":0.01 }, 
+    {"layer":1, "row":30, "column":21, "bhead":200, "cond":0.01 }
+  ]
+]
+
+... }
+
+```
 
 ### Examples:
 - [Input and Output](https://davidjjones.github.io/jsMODFLOW/samples/01_InputOutput.htm)
