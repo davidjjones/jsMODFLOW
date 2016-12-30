@@ -15,6 +15,11 @@ This version partially supports the following MODFLOW modules. Parameterization 
 - EVT
 - GHB 
 
+#### GHB
+
+'
+'sdfs
+'
 
 ### Examples:
 - [Input and Output](https://davidjjones.github.io/jsMODFLOW/samples/01_InputOutput.htm)
