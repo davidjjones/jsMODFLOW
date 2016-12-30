@@ -15,11 +15,12 @@ This version partially supports the following MODFLOW modules. Parameterization 
 - EVT
 - GHB 
 
-#### GHB
+#### GHB (General-Head Boundary)
+Parameters are not supported. The package is enabled if the model input object includes a 'GHB' attribute. This attribute should contain an array with an item for each stress period. Each stress period item is an array of objects describing each general-head boundary condition.
 
-'
-'sdfs
-'
+<
+Layer Row Column Bhead  Cond
+>
 
 ### Examples:
 - [Input and Output](https://davidjjones.github.io/jsMODFLOW/samples/01_InputOutput.htm)
