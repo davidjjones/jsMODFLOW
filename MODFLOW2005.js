@@ -515,14 +515,14 @@ var MODFLOW2005 = function( input ){
     var BCF = {};
     
     // BCF.ibcfcb not used 
-    BCF.iwdflg = false;  // Wetting flag: false -> Wetting is inactive. true –> Wetting is active in layers where LAYCON is 1 or 3.
+    BCF.iwdflg = false;  // Wetting flag: false -> Wetting is inactive. true Â–> Wetting is active in layers where LAYCON is 1 or 3.
     BCF.hdry = 0;    // When a cell converts to dry, HNEW is set equal to hdry.
     BCF.iwetit = 0;  // The iteration interval for attempting to wet cells. Wetting is attempted every iwetit iterations.
     BCF.ihdwet = 0;  // Flag indicating which equation to use for defining the head at a cell that has just converted from dry to wet
     BCF.wetfct = 0;  // Factor included in the calculation of head at a cell that has just converted from dry to wet.
     BCF.layers = []  // contains data for each layer, (including laycon, layavg, hy, sc1, sc2, wetdry, trpy)
-                     //   BCF.layers[k].laycon = []; // 1d, size=BAS.nlay, Layer-type code: 0 – Confined, 1 – Unconfined, 2 – Partially convertible, 3 – Fully convertible
-                     //   BCF.layers[k].layavg = []; // 1d, size=BAS.nlay, Interblock transmissivity flag. 0 – Harmonic mean, 1 – Arithmetic mean, 2 – Logarithmic mean, 3 – Arithmetic-mean saturated thickness and logarithmic-mean hydraulic conductivity.
+                     //   BCF.layers[k].laycon = []; // 1d, size=BAS.nlay, Layer-type code: 0 Â– Confined, 1 Â– Unconfined, 2 Â– Partially convertible, 3 Â– Fully convertible
+                     //   BCF.layers[k].layavg = []; // 1d, size=BAS.nlay, Interblock transmissivity flag. 0 Â– Harmonic mean, 1 Â– Arithmetic mean, 2 Â– Logarithmic mean, 3 Â– Arithmetic-mean saturated thickness and logarithmic-mean hydraulic conductivity.
                      //   BCF.layers[k].hy = [];     // 3d, Hydraulic conductivity.
                      //   BCF.layers[k].sc1 = [];    // 3d, Primary storage capacity. Only needed when simulation is transient.
                      //   BCF.layers[k].sc2 = [];    // 3d, Secondary storage capacity. Only needed when simulation is transient.
@@ -3237,124 +3237,167 @@ var MODFLOW2005 = function( input ){
   }());
   
   var GHB = (function(){ // V!
-    var GHB = {};
-    
-    GHB.AllocateRead = function(input){
-      GHB.data = input.GHB.data;
-      
-      GHB.data = input.GHB.data;
-      
-      // Some validation
-      //
-      var v;
-      if ((v = checkIfArray(GHB.data, BAS.periods.length)) != "ok")
-        badinput("Problem with GHB.data -- " + v);
-      
-      for (var p=0; p<GHB.data.length; p++){
         
-        if ((v = checkIfArray(GHB.data[p])) != "ok")
-          badinput("Problem with GHB.data["+p+"] -- " + v);
+	  var data = {
+      bounds: []
+    };
+    
+    var getData = function(key){
+      // If the key argument was not provided, return all the data
+      if (typeof key == "undefined"){
+        return data;
+      }
+      // If a valid key argument was provided, return the desired data
+      if (data.hasOwnProperty(key)){
+        return data[key];
+      }
+      // If neither of the above, throw an error
+      throw "Could not find item "+ key +" in the GHB package";
+    }
+    
+    
+    var setData = function(key, value){
+      
+      if (key == "bounds"){
+          data.bounds = value;
           
-        for (var a=0; a<GHB.data[p].length; a++){
+          // Some validation
+          //
+          var v;
+          if ((v = checkIfArray(data, BAS.periods.length)) != "ok")
+            badinput("Problem with GHB.data -- " + v);
           
-          if ((v = checkIfInt(GHB.data[p][a].layer)) != "ok")
-            badinput("Problem with GHB.data["+p+"]["+a+"].layer -- " + v);
-          if (GHB.data[p][a].layer <= 0 || GHB.data[p][a].layer > BAS.nlay)
-            badinput("Problem with GHB.data["+p+"]["+a+"].layer -- Value is too large or too small to be a layer number.");
-          if ((v = checkIfInt(GHB.data[p][a].row)) != "ok")
-            badinput("Problem with GHB.data["+p+"]["+a+"].row -- " + v);
-          if (GHB.data[p][a].row <= 0 || GHB.data[p][a].row > BAS.nrow)
-            badinput("Problem with GHB.data["+p+"]["+a+"].row -- Value is too large or too small to be a row number.");
-          if ((v = checkIfInt(GHB.data[p][a].column)) != "ok")
-            badinput("Problem with GHB.data["+p+"]["+a+"].column -- " + v);
-          if (GHB.data[p][a].column <= 0 || GHB.data[p][a].column > BAS.ncol)
-            badinput("Problem with GHB.data["+p+"]["+a+"].column -- Value is too large or too small to be a column number.");
-          if ((v = checkIfNumber(GHB.data[p][a].bhead)) != "ok")
-            badinput("Problem with GHB.data["+p+"]["+a+"].bhead -- " + v);
-          if ((v = checkIfNumber(GHB.data[p][a].cond)) != "ok")
-            badinput("Problem with GHB.data["+p+"]["+a+"].cond -- " + v);
+          for (var p=0; p<data.bounds.length; p++){
             
-        }
+            if ((v = checkIfArray(data.bounds[p])) != "ok")
+              badinput("Problem with GHB.bounds["+p+"] -- " + v);
+              
+            for (var a=0; a<data.bounds[p].length; a++){
+              
+              if ((v = checkIfInt(data.bounds[p][a].layer)) != "ok")
+                badinput("Problem with GHB.bounds["+p+"]["+a+"].layer -- " + v);
+              if (data.bounds[p][a].layer <= 0 || data.bounds[p][a].layer > BAS.nlay)
+                badinput("Problem with GHB.bounds["+p+"]["+a+"].layer -- Value is too large or too small to be a layer number.");
+              if ((v = checkIfInt(data.bounds[p][a].row)) != "ok")
+                badinput("Problem with GHB.bounds["+p+"]["+a+"].row -- " + v);
+              if (data.bounds[p][a].row <= 0 || data.bounds[p][a].row > BAS.nrow)
+                badinput("Problem with GHB.bounds["+p+"]["+a+"].row -- Value is too large or too small to be a row number.");
+              if ((v = checkIfInt(data.bounds[p][a].column)) != "ok")
+                badinput("Problem with GHB.bounds["+p+"]["+a+"].column -- " + v);
+              if (data.bounds[p][a].column <= 0 || data.bounds[p][a].column > BAS.ncol)
+                badinput("Problem with GHB.bounds["+p+"]["+a+"].column -- Value is too large or too small to be a column number.");
+              if ((v = checkIfNumber(data.bounds[p][a].bhead)) != "ok")
+                badinput("Problem with GHB.bounds["+p+"]["+a+"].bhead -- " + v);
+              if ((v = checkIfNumber(data.bounds[p][a].cond)) != "ok")
+                badinput("Problem with GHB.bounds["+p+"]["+a+"].cond -- " + v);
+                
+            }
+            
+          }
         
       }
-      
-      
     }
-    GHB.ReadPrepare = function(){
-      // noting too important
-    }
-    GHB.Formulate = function(kiter, kstp, kper){
-      
-      // C1 - IF NBOUND<=0 THEN THERE ARE NO GENERAL HEAD BOUNDS. RETURN.
-      if ( GHB.data[kper].length == 0 ) return;
-      
-      // C2 - PROCESS EACH ENTRY IN THE GENERAL HEAD BOUND LIST (BNDS).
-      for (var a=0; a<GHB.data[kper].length; a++){
+    
+    return {
+      get: getData,
+      set: setData,
+      subroutines: {
         
-        // C3 - GET COLUMN, ROW AND LAYER OF CELL CONTAINING BOUNDARY.
-        var il = GHB.data[kper][a].layer-1;
-        var ir = GHB.data[kper][a].row-1; 
-        var ic = GHB.data[kper][a].column-1; 
-        
-        // C4 - IF THE CELL IS EXTERNAL SKIP IT.
-        if (BAS.ibound[il][ir][ic] > 0){
+        "AllocateRead" : function(input){
+          if (input.GHB.data){
+            setData("bounds", input.GHB.data);
+          }
+        }
+        ,
+        "ReadPrepare" : function(){
+          // noting too important
+        }
+        ,
+        "Formulate" : function(kiter, kstp, kper){
           
-          // C5 - SINCE THE CELL IS INTERNAL GET THE BOUNDARY DATA.
-          var hb = GHB.data[kper][a].bhead;
-          var c = GHB.data[kper][a].cond;
+          var bounds = data.bounds
           
-          // C6 - ADD TERMS TO RHS AND HCOF.
-          BAS.hcof[il][ir][ic] -= c;
-          BAS.rhs[il][ir][ic] -= c*hb;
+          // C1 - IF NBOUND<=0 THEN THERE ARE NO GENERAL HEAD BOUNDS. RETURN.
+          if ( bounds[kper].length == 0 ) return;
+          
+          // C2 - PROCESS EACH ENTRY IN THE GENERAL HEAD BOUND LIST (BNDS).
+          for (var a=0; a<bounds[kper].length; a++){
+            
+            // C3 - GET COLUMN, ROW AND LAYER OF CELL CONTAINING BOUNDARY.
+            var il = bounds[kper][a].layer-1;
+            var ir = bounds[kper][a].row-1; 
+            var ic = bounds[kper][a].column-1; 
+            
+            // C4 - IF THE CELL IS EXTERNAL SKIP IT.
+            if (BAS.ibound[il][ir][ic] > 0){
+              
+              // C5 - SINCE THE CELL IS INTERNAL GET THE BOUNDARY DATA.
+              var hb = bounds[kper][a].bhead;
+              var c = bounds[kper][a].cond;
+              
+              // C6 - ADD TERMS TO RHS AND HCOF.
+              BAS.hcof[il][ir][ic] -= c;
+              BAS.rhs[il][ir][ic] -= c*hb;
+              
+            }
+            
+          }
           
         }
+        ,
+        "WaterBudget" : function(kstp, kper){
+          
+          var bounds = data.bounds
+          var t = BAS.tstp;
+          
+          var ncel = BAS.nrow * BAS.ncol * BAS.nlay;
+          OUT.ccFlow [t]["GHB"] = new Float32Array(ncel);
+          OUT.vbSumIn [t]["GHB"] = 0;  
+          OUT.vbSumOut [t]["GHB"] = 0;
+          
+          // C5 - LOOP THROUGH EACH BOUNDARY CALCULATING FLOW.
+          for (var a=0; a<bounds[kper].length; a++){
+          
+            // C5A - GET LAYER, ROW & COLUMN OF EACH GENERAL HEAD BOUNDARY.
+            var ir = bounds[kper][a].row-1; 
+            var ic = bounds[kper][a].column-1; 
+            var il = bounds[kper][a].layer-1; 
+            var hb = bounds[kper][a].bhead;
+            var c = bounds[kper][a].cond;
+            var q = 0;
+            var n = ic + ir*BAS.ncol + il*BAS.ncol*BAS.nrow;
+            
+            // C5B - IF CELL IS NO-FLOW OR CONSTANT-HEAD, THEN IGNORE IT.
+            if (BAS.ibound[il][ir][ic] > 0){
+              
+              // C5D - CALCULATE THE FOW RATE INTO THE CELL.
+              q = c*hb - c*BAS.hnew[il][ir][ic];
+              
+              OUT.ccFlow [t]["GHB"][n] = q;
+              if (q<0) { OUT.vbSumOut [t]["GHB"]-=q; }
+              else     { OUT.vbSumIn  [t]["GHB"]+=q; }
+              
+            }
+          }
         
-      }
-      
-    }
-    GHB.WaterBudget = function(kstp, kper){
-      
-      var t = BAS.tstp;
-      
-      var ncel = BAS.nrow * BAS.ncol * BAS.nlay;
-      OUT.ccFlow [t]["GHB"] = new Float32Array(ncel);
-      OUT.vbSumIn [t]["GHB"] = 0;  
-      OUT.vbSumOut [t]["GHB"] = 0;
-      
-      // C5 - LOOP THROUGH EACH BOUNDARY CALCULATING FLOW.
-      for (var a=0; a<GHB.data[kper].length; a++){
-      
-        // C5A - GET LAYER, ROW & COLUMN OF EACH GENERAL HEAD BOUNDARY.
-        var ir = GHB.data[kper][a].row-1; 
-        var ic = GHB.data[kper][a].column-1; 
-        var il = GHB.data[kper][a].layer-1; 
-        var hb = GHB.data[kper][a].bhead;
-        var c = GHB.data[kper][a].cond;
-        var q = 0;
-        var n = ic + ir*BAS.ncol + il*BAS.ncol*BAS.nrow;
+          OUT.vbSumIn [t]["GHB"] *= BAS.delt;  
+          OUT.vbSumOut [t]["GHB"] *= BAS.delt;
         
-        // C5B - IF CELL IS NO-FLOW OR CONSTANT-HEAD, THEN IGNORE IT.
-        if (BAS.ibound[il][ir][ic] > 0){
-          
-          // C5D - CALCULATE THE FOW RATE INTO THE CELL.
-          q = c*hb - c*BAS.hnew[il][ir][ic];
-          
-          OUT.ccFlow [t]["GHB"][n] = q;
-          if (q<0) { OUT.vbSumOut [t]["GHB"]-=q; }
-          else     { OUT.vbSumIn  [t]["GHB"]+=q; }
-          
         }
+        ,
+        "Output" : function(){}
+        ,
+        "DeallocateMemory" : function(){}
       }
+    }; // end return
     
-      OUT.vbSumIn [t]["GHB"] *= BAS.delt;  
-      OUT.vbSumOut [t]["GHB"] *= BAS.delt;
     
-    }
-    GHB.Output = function(){}
-    GHB.DeallocateMemory = function(){}
-    
-    return GHB;
   }());
+  
+  
+  
+  
+  
   
   
   
@@ -3430,7 +3473,7 @@ var MODFLOW2005 = function( input ){
 					if (input.RIV){ RIV.Formulate(kiter, kstp, kper); }
 					if (input.RCH){ RCH.Formulate(kiter, kstp, kper); }
 					if (input.EVT){ EVT.Formulate(kiter, kstp, kper); }
-					if (input.GHB){ GHB.Formulate(kiter, kstp, kper); }
+					if (input.GHB){ GHB.subroutines.Formulate(kiter, kstp, kper); }
           
           // C7C2B---MAKE ONE CUT AT AN APPROXIMATE SOLUTION.
           BAS.ierr = 0;
@@ -3457,7 +3500,7 @@ var MODFLOW2005 = function( input ){
         if (input.RIV){ RIV.WaterBudget(kstp, kper); }
         if (input.RCH){ RCH.WaterBudget(kstp, kper); }
         if (input.EVT){ EVT.WaterBudget(kstp, kper); }
-        if (input.GHB){ GHB.WaterBudget(kstp, kper); }
+        if (input.GHB){ GHB.subroutines.WaterBudget(kstp, kper); }
         
 				BCF.Output(kstp, kper);
         BAS.Output(kstp, kper);
@@ -3520,7 +3563,7 @@ var MODFLOW2005 = function( input ){
     if (input.RIV){ RIV.AllocateRead(input); }
     if (input.SIP){ SIP.AllocateRead(input); }
     if (input.EVT){ EVT.AllocateRead(input); }
-    if (input.GHB){ GHB.AllocateRead(input); }
+    if (input.GHB){ GHB.subroutines.AllocateRead(input); }
     
     return true;
     
