@@ -3675,7 +3675,7 @@ var MODFLOW2005 = function( input ){
       BAS.Stress( kper )
       
       // Read and Prepare
-      if (input.RCH){ RCH.ReadPrepare(kper); }
+      if (input.RCH){ RCH.subroutines.ReadPrepare(kper); }
       if (input.EVT){ EVT.subroutines.ReadPrepare(kper); }
       
       
@@ -3695,10 +3695,10 @@ var MODFLOW2005 = function( input ){
           //FORMULATE THE FINITE DIFFERENCE EQUATIONS.
           BAS.Formulate(kiter, kstp, kper);
           if (input.BCF){ BCF.Formulate(kiter, kstp, kper); }
-          if (input.WEL){ WEL.Formulate(kiter, kstp, kper); }
-          if (input.DRN){ DRN.Formulate(kiter, kstp, kper); }
-          if (input.RIV){ RIV.Formulate(kiter, kstp, kper); }
-          if (input.RCH){ RCH.Formulate(kiter, kstp, kper); }
+          if (input.WEL){ WEL.subroutines.Formulate(kiter, kstp, kper); }
+          if (input.DRN){ DRN.subroutines.Formulate(kiter, kstp, kper); }
+          if (input.RIV){ RIV.subroutines.Formulate(kiter, kstp, kper); }
+          if (input.RCH){ RCH.subroutines.Formulate(kiter, kstp, kper); }
           if (input.EVT){ EVT.subroutines.Formulate(kiter, kstp, kper); }
           if (input.GHB){ GHB.subroutines.Formulate(kiter, kstp, kper); }
           
@@ -3722,10 +3722,10 @@ var MODFLOW2005 = function( input ){
         
         // C7C4 - CALCULATE BUDGET TERMS. SAVE CELL-BY-CELL FLOW TERMS.
         if (input.BCF){ BCF.WaterBudget(kstp, kper); }
-        if (input.WEL){ WEL.WaterBudget(kstp, kper); }
-        if (input.DRN){ DRN.WaterBudget(kstp, kper); }
-        if (input.RIV){ RIV.WaterBudget(kstp, kper); }
-        if (input.RCH){ RCH.WaterBudget(kstp, kper); }
+        if (input.WEL){ WEL.subroutines.WaterBudget(kstp, kper); }
+        if (input.DRN){ DRN.subroutines.WaterBudget(kstp, kper); }
+        if (input.RIV){ RIV.subroutines.WaterBudget(kstp, kper); }
+        if (input.RCH){ RCH.subroutines.WaterBudget(kstp, kper); }
         if (input.EVT){ EVT.subroutines.WaterBudget(kstp, kper); }
         if (input.GHB){ GHB.subroutines.WaterBudget(kstp, kper); }
         
@@ -3784,10 +3784,10 @@ var MODFLOW2005 = function( input ){
     // ALLOCATE AND READ (AR) PROCEDURE
     BAS.AllocateRead(input);
     if (input.BCF){ BCF.AllocateRead(input); }
-    if (input.WEL){ WEL.AllocateRead(input); }
-    if (input.DRN){ DRN.AllocateRead(input); }
-    if (input.RCH){ RCH.AllocateRead(input); }
-    if (input.RIV){ RIV.AllocateRead(input); }
+    if (input.WEL){ WEL.subroutines.AllocateRead(input); }
+    if (input.DRN){ DRN.subroutines.AllocateRead(input); }
+    if (input.RCH){ RCH.subroutines.AllocateRead(input); }
+    if (input.RIV){ RIV.subroutines.AllocateRead(input); }
     if (input.SIP){ SIP.AllocateRead(input); }
     if (input.EVT){ EVT.subroutines.AllocateRead(input); }
     if (input.GHB){ GHB.subroutines.AllocateRead(input); }
