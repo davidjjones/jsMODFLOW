@@ -2358,226 +2358,310 @@ var MODFLOW2005 = function( input ){
   }());
   
   var WEL = (function(){ // V!
-    var WEL = {};
     
-    WEL.AllocateRead = function(input){
-      WEL.data = input.WEL.data;
+    var data = {
+      bounds: []
+    };
+    
+    /** Allow the data used by this package to be accessed by other packages or external code */
+    var getData = function(key){
+      // If the key argument was not provided, return all the data
+      if (typeof key == "undefined"){
+        return data;
+      }
+      // If a valid key argument was provided, return the desired data
+      if (data.hasOwnProperty(key)){
+        return data[key];
+      }
+      // If neither of the above, throw an error
+      throw "Could not find item "+ key +" in the package";
+    }
+    
+    /** Allow the data used by this package to be set by other packages or external code */
+    var setData = function(key, value){
       
-      // Some validation
-      //
-      var v;
-      if ((v = checkIfArray(WEL.data, BAS.periods.length)) != "ok")
-        badinput("Problem with WEL.data -- " + v);
-      
-      for (var p=0; p<WEL.data.length; p++){
+      if (key == "bounds"){
+        data.bounds = value;
+        var bounds = data.bounds;
         
-        if ((v = checkIfArray(WEL.data[p])) != "ok")
-          badinput("Problem with WEL.data["+p+"] -- " + v);
+        // Some validation
+        //
+        var v;
+        if ((v = checkIfArray(bounds, BAS.periods.length)) != "ok")
+          badinput("Problem with WEL.data -- " + v);
+        
+        for (var p=0; p<bounds.length; p++){
           
-        for (var a=0; a<WEL.data[p].length; a++){
-          
-          if ((v = checkIfInt(WEL.data[p][a].layer)) != "ok")
-            badinput("Problem with WEL.data["+p+"]["+a+"].layer -- " + v);
-          if (WEL.data[p][a].layer <= 0 || WEL.data[p][a].layer > BAS.nlay)
-            badinput("Problem with WEL.data["+p+"]["+a+"].layer -- Value is too large or too small to be a layer number.");
-          if ((v = checkIfInt(WEL.data[p][a].row)) != "ok")
-            badinput("Problem with WEL.data["+p+"]["+a+"].row -- " + v);
-          if (WEL.data[p][a].row <= 0 || WEL.data[p][a].row > BAS.nrow)
-            badinput("Problem with WEL.data["+p+"]["+a+"].row -- Value is too large or too small to be a row number.");
-          if ((v = checkIfInt(WEL.data[p][a].column)) != "ok")
-            badinput("Problem with WEL.data["+p+"]["+a+"].column -- " + v);
-          if (WEL.data[p][a].column <= 0 || WEL.data[p][a].column > BAS.ncol)
-            badinput("Problem with WEL.data["+p+"]["+a+"].column -- Value is too large or too small to be a column number.");
-          if ((v = checkIfNumber(WEL.data[p][a].q)) != "ok")
-            badinput("Problem with WEL.data["+p+"]["+a+"].q -- " + v);
+          if ((v = checkIfArray(bounds[p])) != "ok")
+            badinput("Problem with WEL.data["+p+"] -- " + v);
             
-        }
-        
-      }
-      
-    }
-    
-    WEL.ReadPrepare = function(){
-      // ?? I didn't see anything neccessary
-      
-    }
-    WEL.Formulate = function(kiter, kstp, kper){
-      
-      if ( WEL.data[kper].length == 0 ) return;
-      
-      for (var a=0; a<WEL.data[kper].length; a++){
-        
-        var ir = WEL.data[kper][a].row-1; 
-        var ic = WEL.data[kper][a].column-1; 
-        var il = WEL.data[kper][a].layer-1; 
-        var q = WEL.data[kper][a].q; 
-        
-        // C2A - IF THE CELL IS INACTIVE THEN BYPASS PROCESSING.
-        if (BAS.ibound[il][ir][ic] > 0){
+          for (var a=0; a<bounds[p].length; a++){
+            
+            if ((v = checkIfInt(bounds[p][a].layer)) != "ok")
+              badinput("Problem with WEL.data["+p+"]["+a+"].layer -- " + v);
+            if (bounds[p][a].layer <= 0 || bounds[p][a].layer > BAS.nlay)
+              badinput("Problem with WEL.data["+p+"]["+a+"].layer -- Value is too large or too small to be a layer number.");
+            if ((v = checkIfInt(bounds[p][a].row)) != "ok")
+              badinput("Problem with WEL.data["+p+"]["+a+"].row -- " + v);
+            if (bounds[p][a].row <= 0 || bounds[p][a].row > BAS.nrow)
+              badinput("Problem with WEL.data["+p+"]["+a+"].row -- Value is too large or too small to be a row number.");
+            if ((v = checkIfInt(bounds[p][a].column)) != "ok")
+              badinput("Problem with WEL.data["+p+"]["+a+"].column -- " + v);
+            if (bounds[p][a].column <= 0 || bounds[p][a].column > BAS.ncol)
+              badinput("Problem with WEL.data["+p+"]["+a+"].column -- Value is too large or too small to be a column number.");
+            if ((v = checkIfNumber(bounds[p][a].q)) != "ok")
+              badinput("Problem with WEL.data["+p+"]["+a+"].q -- " + v);
+              
+          }
           
-          // C2B - IF THE CELL IS VARIABLE HEAD THEN SUBTRACT Q FROM
-          //       THE RHS ACCUMULATOR.
-          BAS.rhs[il][ir][ic] -= q;
-        }
+        } 
         
       }
       
     }
-    WEL.WaterBudget = function(kstp, kper){
-      
-      var t = BAS.tstp;
-      
-      var ncel = BAS.nrow * BAS.ncol * BAS.nlay;
-      OUT.ccFlow [t]["WEL"] = new Float32Array(ncel);
-      OUT.vbSumIn [t]["WEL"] = 0;  
-      OUT.vbSumOut [t]["WEL"] = 0;
-      
-      // C5 - LOOP THROUGH EACH WELL CALCULATING FLOW.
-      for (var a=0; a<WEL.data[kper].length; a++){
-        var ir = WEL.data[kper][a].row-1; 
-        var ic = WEL.data[kper][a].column-1; 
-        var il = WEL.data[kper][a].layer-1; 
-        var q = WEL.data[kper][a].q; 
-        var n = ic + ir*BAS.ncol + il*BAS.ncol*BAS.nrow;
-        
-        // C5B - IF THE CELL IS NO-FLOW OR CONSTANT_HEAD, IGNORE IT.
-        if (BAS.ibound[il][ir][ic] > 0){
-          OUT.ccFlow [t]["WEL"][n] = q;
-          if (q>0){
-            OUT.vbSumIn [t]["WEL"]+=q;
-          }
-          else{
-            OUT.vbSumOut [t]["WEL"]-=q;
-          }
-        }
-      }
-     
-      OUT.vbSumIn [t]["WEL"] *= BAS.delt;  
-      OUT.vbSumOut [t]["WEL"] *= BAS.delt;
-      
-    }
-    WEL.DeallocateMemory = function(){}
     
-    return WEL;
+    
+    return {
+      get: getData,
+      set: setData,
+      subroutines: {
+    
+        "AllocateRead" : function(input){
+          
+          setData("bounds", input.WEL.data);
+          
+        }
+        ,
+        "ReadPrepare" : function(){
+          // ?? I didn't see anything neccessary
+          
+        }
+        ,
+        "Formulate" : function(kiter, kstp, kper){
+          var bounds = data.bounds;
+          
+          if ( bounds[kper].length == 0 ) return;
+          
+          for (var a=0; a<bounds[kper].length; a++){
+            
+            var ir = bounds[kper][a].row-1; 
+            var ic = bounds[kper][a].column-1; 
+            var il = bounds[kper][a].layer-1; 
+            var q = bounds[kper][a].q; 
+            
+            // C2A - IF THE CELL IS INACTIVE THEN BYPASS PROCESSING.
+            if (BAS.ibound[il][ir][ic] > 0){
+              
+              // C2B - IF THE CELL IS VARIABLE HEAD THEN SUBTRACT Q FROM
+              //       THE RHS ACCUMULATOR.
+              BAS.rhs[il][ir][ic] -= q;
+            }
+            
+          }
+          
+        }
+        ,
+        "WaterBudget" : function(kstp, kper){
+          var bounds = data.bounds;
+          var t = BAS.tstp;
+          
+          var ncel = BAS.nrow * BAS.ncol * BAS.nlay;
+          OUT.ccFlow [t]["WEL"] = new Float32Array(ncel);
+          OUT.vbSumIn [t]["WEL"] = 0;  
+          OUT.vbSumOut [t]["WEL"] = 0;
+          
+          // C5 - LOOP THROUGH EACH WELL CALCULATING FLOW.
+          for (var a=0; a<bounds[kper].length; a++){
+            var ir = bounds[kper][a].row-1; 
+            var ic = bounds[kper][a].column-1; 
+            var il = bounds[kper][a].layer-1; 
+            var q = bounds[kper][a].q; 
+            var n = ic + ir*BAS.ncol + il*BAS.ncol*BAS.nrow;
+            
+            // C5B - IF THE CELL IS NO-FLOW OR CONSTANT_HEAD, IGNORE IT.
+            if (BAS.ibound[il][ir][ic] > 0){
+              OUT.ccFlow [t]["WEL"][n] = q;
+              if (q>0){
+                OUT.vbSumIn [t]["WEL"]+=q;
+              }
+              else{
+                OUT.vbSumOut [t]["WEL"]-=q;
+              }
+            }
+          }
+         
+          OUT.vbSumIn [t]["WEL"] *= BAS.delt;  
+          OUT.vbSumOut [t]["WEL"] *= BAS.delt;
+          
+        }
+        ,
+        "DeallocateMemory" : function(){}
+        
+      }
+    } // end return
+    
   }());
   
+  
+  
+  
   var DRN = (function(){ // V!
-    var DRN = {};
     
-    DRN.AllocateRead = function(input){
-      DRN.data = input.DRN.data;
+    var data = {
+      bounds: []
+    };
+    
+    /** Allow the data used by this package to be accessed by other packages or external code */
+    var getData = function(key){
+      // If the key argument was not provided, return all the data
+      if (typeof key == "undefined"){
+        return data;
+      }
+      // If a valid key argument was provided, return the desired data
+      if (data.hasOwnProperty(key)){
+        return data[key];
+      }
+      // If neither of the above, throw an error
+      throw "Could not find item "+ key +" in the package";
+    }
+    
+    /** Allow the data used by this package to be set by other packages or external code */
+    var setData = function(key, value){
       
-      // Some validation
-      //
-      var v;
-      if ((v = checkIfArray(DRN.data, BAS.periods.length)) != "ok")
-        badinput("Problem with DRN.data -- " + v);
-      
-      for (var p=0; p<DRN.data.length; p++){
+      if (key == "bounds"){
+        data.bounds = value;
+        var bounds = data.bounds;
         
-        if ((v = checkIfArray(DRN.data[p])) != "ok")
-          badinput("Problem with DRN.data["+p+"] -- " + v);
+        // Some validation
+        //
+        var v;
+        if ((v = checkIfArray(bounds, BAS.periods.length)) != "ok")
+          badinput("Problem with DRN.data -- " + v);
+        
+        for (var p=0; p<bounds.length; p++){
           
-        for (var a=0; a<DRN.data[p].length; a++){
-          
-          if ((v = checkIfInt(DRN.data[p][a].layer)) != "ok")
-            badinput("Problem with DRN.data["+p+"]["+a+"].layer -- " + v);
-          if (DRN.data[p][a].layer <= 0 || DRN.data[p][a].layer > BAS.nlay)
-            badinput("Problem with DRN.data["+p+"]["+a+"].layer -- Value is too large or too small to be a layer number.");
-          if ((v = checkIfInt(DRN.data[p][a].row)) != "ok")
-            badinput("Problem with DRN.data["+p+"]["+a+"].row -- " + v);
-          if (DRN.data[p][a].row <= 0 || DRN.data[p][a].row > BAS.nrow)
-            badinput("Problem with DRN.data["+p+"]["+a+"].row -- Value is too large or too small to be a row number.");
-          if ((v = checkIfInt(DRN.data[p][a].column)) != "ok")
-            badinput("Problem with DRN.data["+p+"]["+a+"].column -- " + v);
-          if (DRN.data[p][a].column <= 0 || DRN.data[p][a].column > BAS.ncol)
-            badinput("Problem with DRN.data["+p+"]["+a+"].column -- Value is too large or too small to be a column number.");
-          if ((v = checkIfNumber(DRN.data[p][a].elevation)) != "ok")
-            badinput("Problem with DRN.data["+p+"]["+a+"].elevation -- " + v);
-          if ((v = checkIfNumber(DRN.data[p][a].condfact)) != "ok")
-            badinput("Problem with DRN.data["+p+"]["+a+"].condfact -- " + v);
+          if ((v = checkIfArray(bounds[p])) != "ok")
+            badinput("Problem with DRN.data["+p+"] -- " + v);
             
-        }
-        
-      }
-      
-      
-    }
-    DRN.ReadPrepare = function(){
-      // noting too important
-    }
-    DRN.Formulate = function(kiter, kstp, kper){
-      
-      if ( DRN.data[kper].length == 0 ) return;
-      
-      for (var a=0; a<DRN.data[kper].length; a++){
-        
-        var ir = DRN.data[kper][a].row-1; 
-        var ic = DRN.data[kper][a].column-1; 
-        var il = DRN.data[kper][a].layer-1;
-        
-        // C4 - IF THE CELL IS EXTERNAL SKIP IT.
-        if (BAS.ibound[il][ir][ic] > 0){
-          
-          // C5 - IF THE CELL IS INTERNAL GET THE DRAIN DATA.
-          var el = DRN.data[kper][a].elevation;
-          var c = DRN.data[kper][a].condfact
-          
-          if (BAS.hnew[il][ir][ic] > el){
-            // C7 - HEAD IS HIGHER THAN DRAIN. ADD TERMS TO RHS AND HCOF.
-            BAS.hcof[il][ir][ic] -= c;
-            BAS.rhs[il][ir][ic] -= c*el;
-          }
-        }
-        
-      }
-      
-    }
-    DRN.WaterBudget = function(kstp, kper){
-      
-      var t = BAS.tstp;
-      
-      var ncel = BAS.nrow * BAS.ncol * BAS.nlay;
-      OUT.ccFlow [t]["DRN"] = new Float32Array(ncel);
-      OUT.vbSumIn [t]["DRN"] = 0;  
-      OUT.vbSumOut [t]["DRN"] = 0;
-      
-      // C5 - LOOP THROUGH EACH DRAIN CALCULATING FLOW.
-      for (var a=0; a<DRN.data[kper].length; a++){
-      
-        // C5A - GET LAYER, ROW & COLUMN OF CELL CONTAINING REACH.
-        var ir = DRN.data[kper][a].row-1; 
-        var ic = DRN.data[kper][a].column-1; 
-        var il = DRN.data[kper][a].layer-1; 
-        var el = DRN.data[kper][a].elevation;
-        var c = DRN.data[kper][a].condfact
-        var q = 0;
-        var n = ic + ir*BAS.ncol + il*BAS.ncol*BAS.nrow;
-        
-        // C5B - IF THE CELL IS NO-FLOW OR CONSTANT_HEAD, IGNORE IT.
-        if (BAS.ibound[il][ir][ic] > 0){
-          
-          // C5D - IF HEAD HIGHER THAN DRAIN, CALCULATE Q=C*(EL-HHNEW).
-          // C5D - SUBTRACT Q FROM RATOUT.
-          if (BAS.hnew[il][ir][ic] > el){
-            q=c*el - c*BAS.hnew[il][ir][ic];
+          for (var a=0; a<bounds[p].length; a++){
+            
+            if ((v = checkIfInt(bounds[p][a].layer)) != "ok")
+              badinput("Problem with DRN.data["+p+"]["+a+"].layer -- " + v);
+            if (bounds[p][a].layer <= 0 || bounds[p][a].layer > BAS.nlay)
+              badinput("Problem with DRN.data["+p+"]["+a+"].layer -- Value is too large or too small to be a layer number.");
+            if ((v = checkIfInt(bounds[p][a].row)) != "ok")
+              badinput("Problem with DRN.data["+p+"]["+a+"].row -- " + v);
+            if (bounds[p][a].row <= 0 || bounds[p][a].row > BAS.nrow)
+              badinput("Problem with DRN.data["+p+"]["+a+"].row -- Value is too large or too small to be a row number.");
+            if ((v = checkIfInt(bounds[p][a].column)) != "ok")
+              badinput("Problem with DRN.data["+p+"]["+a+"].column -- " + v);
+            if (bounds[p][a].column <= 0 || bounds[p][a].column > BAS.ncol)
+              badinput("Problem with DRN.data["+p+"]["+a+"].column -- Value is too large or too small to be a column number.");
+            if ((v = checkIfNumber(bounds[p][a].elevation)) != "ok")
+              badinput("Problem with DRN.data["+p+"]["+a+"].elevation -- " + v);
+            if ((v = checkIfNumber(bounds[p][a].condfact)) != "ok")
+              badinput("Problem with DRN.data["+p+"]["+a+"].condfact -- " + v);
+              
           }
           
-          OUT.ccFlow [t]["DRN"][n] = q;
-          OUT.vbSumOut [t]["DRN"]-=q;
-          
         }
       }
-    
-      OUT.vbSumIn [t]["DRN"] *= BAS.delt;  
-      OUT.vbSumOut [t]["DRN"] *= BAS.delt;
-    
     }
-    DRN.Output = function(){}
-    DRN.DeallocateMemory = function(){}
     
-    return DRN;
+    return {
+      get: getData,
+      set: setData,
+      subroutines: {
+    
+        "AllocateRead" : function(input){
+          setData("bounds", input.DRN.data)
+        }
+        ,
+        "ReadPrepare" : function(){
+          // noting too important
+        }
+        ,
+        "Formulate" : function(kiter, kstp, kper){
+          var bounds = data.bounds;
+          
+          if ( bounds[kper].length == 0 ) return;
+          
+          for (var a=0; bounds[kper].length; a++){
+            
+            var ir = bounds[kper][a].row-1; 
+            var ic = bounds[kper][a].column-1; 
+            var il = bounds[kper][a].layer-1;
+            
+            // C4 - IF THE CELL IS EXTERNAL SKIP IT.
+            if (BAS.ibound[il][ir][ic] > 0){
+              
+              // C5 - IF THE CELL IS INTERNAL GET THE DRAIN DATA.
+              var el = bounds[kper][a].elevation;
+              var c = bounds[kper][a].condfact
+              
+              if (BAS.hnew[il][ir][ic] > el){
+                // C7 - HEAD IS HIGHER THAN DRAIN. ADD TERMS TO RHS AND HCOF.
+                BAS.hcof[il][ir][ic] -= c;
+                BAS.rhs[il][ir][ic] -= c*el;
+              }
+            }
+            
+          }
+          
+        }
+        ,
+        "WaterBudget" : function(kstp, kper){
+          
+          var bounds = data.bounds;
+          
+          var t = BAS.tstp;
+          
+          var ncel = BAS.nrow * BAS.ncol * BAS.nlay;
+          OUT.ccFlow [t]["DRN"] = new Float32Array(ncel);
+          OUT.vbSumIn [t]["DRN"] = 0;  
+          OUT.vbSumOut [t]["DRN"] = 0;
+          
+          // C5 - LOOP THROUGH EACH DRAIN CALCULATING FLOW.
+          for (var a=0; a<bounds[kper].length; a++){
+          
+            // C5A - GET LAYER, ROW & COLUMN OF CELL CONTAINING REACH.
+            var ir = bounds[kper][a].row-1; 
+            var ic = bounds[kper][a].column-1; 
+            var il = bounds[kper][a].layer-1; 
+            var el = bounds[kper][a].elevation;
+            var c = bounds[kper][a].condfact
+            var q = 0;
+            var n = ic + ir*BAS.ncol + il*BAS.ncol*BAS.nrow;
+            
+            // C5B - IF THE CELL IS NO-FLOW OR CONSTANT_HEAD, IGNORE IT.
+            if (BAS.ibound[il][ir][ic] > 0){
+              
+              // C5D - IF HEAD HIGHER THAN DRAIN, CALCULATE Q=C*(EL-HHNEW).
+              // C5D - SUBTRACT Q FROM RATOUT.
+              if (BAS.hnew[il][ir][ic] > el){
+                q=c*el - c*BAS.hnew[il][ir][ic];
+              }
+              
+              OUT.ccFlow [t]["DRN"][n] = q;
+              OUT.vbSumOut [t]["DRN"]-=q;
+              
+            }
+          }
+        
+          OUT.vbSumIn [t]["DRN"] *= BAS.delt;  
+          OUT.vbSumOut [t]["DRN"] *= BAS.delt;
+        
+        }
+        ,
+        "Output" : function(){}
+        ,
+        "DeallocateMemory" : function(){}
+      }
+    } // end return
+    
   }());
+  
+  
   
   var RCH = (function(){ // V!
     
@@ -2678,6 +2762,9 @@ var MODFLOW2005 = function( input ){
         }
         
       }
+      if (key == "calc"){
+        data.calc = value;
+      }
     }
     
     return {
@@ -2713,7 +2800,6 @@ var MODFLOW2005 = function( input ){
           // C5 - IF NRCHOP=2 THEN A LAYER INDICATOR ARRAY IS NEEDED.  TEST INIRCH
           // C5 - TO SEE HOW TO DEFINE IRCH.
           if (data.nrchop == 2){
-            
             
             // C5B - INIRCH=>0, SO CALL U2DINT TO READ LAYER INDICATOR ARRAY(IRCH)
             for (var ir=0; ir<BAS.nrow; ir++){
