@@ -2580,390 +2580,483 @@ var MODFLOW2005 = function( input ){
   }());
   
   var RCH = (function(){ // V!
-    var RCH = {};
-    RCH.nrchop = 0; // (1)-Layer 1 is recharged, 
-                    // (2)-use IRCH to determine, 
-                    // (3)-application of the recharge to the uppermost variable-head cell in the vertical column, provided no constant-head cell is above the variable-head cell in the column
-    RCH.irch = [];  // ?? Should this be variable for each stress period? Right now it is constant.
-    RCH.rech = []; 
-    RCH.calc = []; // this is the recharge for a particular stress period multiplied by cell area
     
-    RCH.AllocateRead = function(input){
+    var data = {
+      nrchop: 0,  /* (1)-Layer 1 is recharged, 
+                     (2)-use IRCH to determine, 
+                     (3)-application of the recharge to the uppermost variable-head cell in the vertical column, 
+                         provided no constant-head cell is above the variable-head cell in the column            */
+      irch: [], 
+      rech: [], 
+      
+      calc: []  // this is the recharge for a particular stress period multiplied by cell area
+    };
     
-      RCH.nrchop = input.RCH.nrchop;
-      if ((v = checkIfInt(RCH.nrchop)) != "ok")
-        badinput("Problem with RCH.nrchop (the recharge option code) -- " + v);
-      
-      // C4 - CHECK TO SEE THAT OPTION IS LEGAL.
-      
-      if ( RCH.nrchop != 1 && RCH.nrchop != 2 && RCH.nrchop != 3 ){
-        badinput("Problem with RCH.nrchop (the recharge option code) -- Illegal option code of "+RCH.nrchop+", expected 1, 2 or 3.");
+    /** Allow the data used by this package to be accessed by other packages or external code */
+    var getData = function(key){
+      // If the key argument was not provided, return all the data
+      if (typeof key == "undefined"){
+        return data;
       }
-      // C5 - OPTION IS LEGAL -- PRINT OPTION CODE.
-      if ( RCH.nrchop == 1 ) OUT.Write("OPTION 1 -- RECHARGE TO TOP LAYER")
-      if ( RCH.nrchop == 2 ) OUT.Write("OPTION 2 -- RECHARGE TO ONE SPECIFIED NODE IN EACH VERTICAL COLUMN")
-      if ( RCH.nrchop == 3 ) OUT.Write("OPTION 3 -- RECHARGE TO HIGHEST ACTIVE NODE IN EACH VERTICAL COLUMN")
-      
-      RCH.irch = input.RCH.irch;
-      RCH.rech = input.RCH.rech;
-      
-      // initialize calc array
-      for (var ir=0; ir<BAS.nrow; ir++){
-        RCH.calc[ir]=[];
-        for (var ic=0; ic<BAS.ncol; ic++){
-          RCH.calc[ir][ic]=0
-        }
+      // If a valid key argument was provided, return the desired data
+      if (data.hasOwnProperty(key)){
+        return data[key];
       }
-      
-      
-      // Validate irch and rech
-      var v;
-      if ((v = checkIfArray(RCH.rech, BAS.periods.length)) != "ok")
-        badinput("Problem with RCH.rech -- " + v);
-      
-      for (var p=0; p<RCH.rech.length; p++){
-        if ((v = checkIfArray(RCH.rech[p], BAS.nrow)) != "ok")
-          badinput("Problem with RCH.rech["+p+"] -- " + v);
-        for (var i=0; i<RCH.rech[p].length; i++){
-          if ((v = checkIfArray(RCH.rech[p][i], BAS.ncol)) != "ok")
-            badinput("Problem with RCH.rech["+p+"]["+i+"] -- " + v); 
-          for (var j=0; j<RCH.rech[p][i].length; j++){
-            if ((v = checkIfNumber(RCH.rech[p][i][j])) != "ok")
-              badinput("Problem with RCH.rech["+p+"]["+i+"]["+j+"] -- " + v);
-          }
-        }
-      }
-      
-      if (RCH.nrchop == 2){
-      
-        if ((v = checkIfArray(RCH.irch, BAS.periods.length)) != "ok")
-          badinput("Problem with RCH.irch -- " + v);
-        
-        for (var p=0; p<RCH.irch.length; p++){
-          if ((v = checkIfArray(RCH.irch[p], BAS.nrow)) != "ok")
-            badinput("Problem with RCH.irch["+p+"] -- " + v);
-          for (var i=0; i<RCH.irch[p].length; i++){
-            if ((v = checkIfArray(RCH.irch[p][i], BAS.ncol)) != "ok")
-              badinput("Problem with RCH.irch["+p+"]["+i+"] -- " + v); 
-            for (var j=0; j<RCH.irch[p][i].length; j++){
-              if ((v = checkIfInt(RCH.irch[p][i][j])) != "ok")
-                badinput("Problem with RCH.irch["+p+"]["+i+"]["+j+"] -- " + v);
-              if (RCH.irch[p][i][j] < 1 || RCH.irch[p][i][j] > BAS.nlay)
-                badinput("Problem with RCH.irch["+p+"]["+i+"]["+j+"] -- Value is not a valid layer number.");
-            }
-          }
-        }
-      
-      }
-      
+      // If neither of the above, throw an error
+      throw "Could not find item "+ key +" in the RCH package";
     }
-    RCH.ReadPrepare = function(kper){
+    
+    /** Allow the data used by this package to be set by other packages or external code */
+    var setData = function(key, value){
       
-      // C4 - MULTIPLY RECHARGE RATE BY CELL AREA TO GET VOLUMETRIC RATE.
-      for (var ir=0; ir<BAS.nrow; ir++){
-        for (var ic=0; ic<BAS.ncol; ic++){
-          RCH.calc[ir][ic] = RCH.rech[kper][ir][ic] * BAS.delr[ic]*BAS.delc[ir];
-        }
-      }
-      
-      // C5 - IF NRCHOP=2 THEN A LAYER INDICATOR ARRAY IS NEEDED.  TEST INIRCH
-      // C5 - TO SEE HOW TO DEFINE IRCH.
-      if (RCH.nrchop == 2){
+      if (key == "nrchop"){
+        data.nrchop = value;
+        if ((v = checkIfInt(data.nrchop)) != "ok")
+          badinput("Problem with RCH.nrchop (the recharge option code) -- " + v);
         
-        
-        // C5B - INIRCH=>0, SO CALL U2DINT TO READ LAYER INDICATOR ARRAY(IRCH)
-        for (var ir=0; ir<BAS.nrow; ir++){
-          for (var ic=0; ic<BAS.ncol; ic++){
-            if (RCH.irch[kper][ir][ic] < 1 || RCH.irch[kper][ir][ic] > BAS.nlay ){
-              throw "INVALID LAYER NUMBER IN IRCH FOR COLUMN "+ic+"  ROW "+ir+"  : "+RCH.irch[kper][ir][ic];
-            }
-          }
+        // C4 - CHECK TO SEE THAT OPTION IS LEGAL.
+        if ( data.nrchop != 1 && data.nrchop != 2 && data.nrchop != 3 ){
+          badinput("Problem with RCH.nrchop (the recharge option code) -- Illegal option code of "+data.nrchop+", expected 1, 2 or 3.");
         }
         
+        // C5 - OPTION IS LEGAL -- PRINT OPTION CODE.
+        if ( data.nrchop == 1 ) OUT.Write("OPTION 1 -- RECHARGE TO TOP LAYER")
+        if ( data.nrchop == 2 ) OUT.Write("OPTION 2 -- RECHARGE TO ONE SPECIFIED NODE IN EACH VERTICAL COLUMN")
+        if ( data.nrchop == 3 ) OUT.Write("OPTION 3 -- RECHARGE TO HIGHEST ACTIVE NODE IN EACH VERTICAL COLUMN")
       }
       
-    }
-    RCH.Formulate = function(kiter, kstp, kper){
-      
-      // C2 - DETERMINE WHICH RECHARGE OPTION.
-      
-      if (RCH.nrchop == 1){
-        // C3 - NRCHOP IS 1, SO RECHARGE IS IN TOP LAYER. LAYER INDEX IS 1.
-        for (var ir=0; ir<BAS.nrow; ir++){
-          for (var ic=0; ic<BAS.ncol; ic++){
-            if (BAS.ibound[0][ir][ic] > 0){
-              BAS.rhs[0][ir][ic] -= RCH.calc[ir][ic];
-            }
-            continue;
-          }
-        }
-      }
-      
-      if (RCH.nrchop == 2){
-        // C4 - NRCHOP IS 2, SO RECHARGE IS INTO LAYER IN INDICATOR ARRAY
-        for (var ir=0; ir<BAS.nrow; ir++){
-          for (var ic=0; ic<BAS.ncol; ic++){
-            var il = RCH.irch[kper][ir][ic] - 1;
-            if (il<0) continue;
-            if (BAS.ibound[il][ir][ic] > 0){
-              BAS.rhs[il][ir][ic] -= RCH.calc[ir][ic];
-            }
-            continue;
-          }
-        }
-      }
-      
-      if (RCH.nrchop == 3){
-        // C5 - NRCHOP IS 3, RECHARGE IS INTO HIGHEST VARIABLE-HEAD CELL, EXCEPT
-        // C5 - CANNOT PASS THROUGH CONSTANT HEAD NODE
-        for (var ir=0; ir<BAS.nrow; ir++){
-          for (var ic=0; ic<BAS.ncol; ic++){
-            for (var il=0; il<BAS.nlay; il++){
-              // C5A - IF CELL IS CONSTANT HEAD MOVE ON TO NEXT HORIZONTAL LOCATION.
-              if (BAS.ibound[il][ir][ic] < 0){ il=BAS.nlay; continue; }
-              
-              if (BAS.ibound[il][ir][ic] > 0){
-                BAS.rhs[il][ir][ic] -= RCH.calc[ir][ic];
-                il=BAS.nlay; continue;
-              }
-              
-            }
-          }
-        }
-      }
-      
-      
-    }
-    RCH.WaterBudget = function(kstp, kper){
-      
-      var t = BAS.tstp;
-      
-      var ncel = BAS.nrow * BAS.ncol * BAS.nlay;
-      OUT.ccFlow [t]["RCH"] = new Float32Array(ncel);
-      OUT.vbSumIn [t]["RCH"] = 0;  
-      OUT.vbSumOut [t]["RCH"] = 0;
-      
-      //C4 - DETERMINE THE RECHARGE OPTION.
-      if (RCH.nrchop==1){
-        // C5 - NRCHOP=1, SO RECH GOES INTO LAYER 1. PROCESS EACH HORIZONTAL
-        // C5 - CELL LOCATION.
-        var n=0;
-        for (var i=0; i<BAS.nrow; i++){
-          for (var j=0; j<BAS.ncol; j++,n++){
-            // C5A - IF CELL IS VARIABLE HEAD, THEN DO BUDGET FOR IT.
-            if (BAS.ibound[0][i][j] > 0){
-              var q = RCH.calc[i][j];
-              OUT.ccFlow [t]["RCH"][n] = q;
-              if (q>0){
-                OUT.vbSumIn [t]["RCH"]+=q;
-              }
-              else{
-                OUT.vbSumOut [t]["RCH"]-=q;
-              }
-            }
-          }
-        }
-      }
-      else if (RCH.nrchop==2){
-        // C6 - NRCHOP=2, RECH IS IN LAYER SPECIFIED IN INDICATOR ARRAY(IRCH).
-        // C6 - PROCESS EACH HORIZONTAL CELL LOCATION.
-        var n=0;
-        for (var i=0; i<BAS.nrow; i++){
-          for (var j=0; j<BAS.ncol; j++,n++){
-            // C6A - GET LAYER INDEX FROM INDICATOR ARRAY(IRCH).
-            var il = RCH.irch[kper][i][j]-1;
-            // C6B - IF CELL IS VARIABLE HEAD, THEN DO BUDGET FOR IT.
-            if (BAS.ibound[il][i][j] > 0){
-              var q = RCH.calc[i][j];
-              OUT.ccFlow [t]["RCH"][n+il*(BAS.nrow*BAS.ncol)] = q;
-              if (q>0){
-                OUT.vbSumIn [t]["RCH"]+=q;
-              }
-              else{
-                OUT.vbSumOut [t]["RCH"]-=q;
-              }
-            }
-          }
-        }
-      }
-      else if (RCH.nrchop==3){
-        // C7 - NRCHOP=3; RECHARGE IS INTO HIGHEST CELL IN A VERTICAL COLUMN
-        // C7 - THAT IS NOT NO FLOW.  PROCESS EACH HORIZONTAL CELL LOCATION.
-        var n=0;
-        for (var i=0; i<BAS.nrow; i++){
-          for (var j=0; j<BAS.ncol; j++,n++){
+      if (key == "irch"){
+        data.irch = value;
+        
+        // Validate irch
+        var v;
+        
+        if (data.nrchop == 2){
+        
+          if ((v = checkIfArray(data.irch, BAS.periods.length)) != "ok")
+            badinput("Problem with RCH.irch -- " + v);
           
-            // C7A - INITIALIZE IRCH TO 1, AND LOOP THROUGH CELLS IN A VERTICAL
-            // C7A - COLUMN TO FIND WHERE TO PLACE RECHARGE.
-            for (var k=0; k<BAS.nlay; k++){
-            
-              // C7B - IF CELL IS CONSTANT HEAD, MOVE ON TO NEXT HORIZONTAL LOCATION.
-              if (BAS.ibound[k][i][j] < 0) break;
-              
-              if (BAS.ibound[k][i][j] > 0){
-            
-                var q = RCH.calc[i][j];
-                OUT.ccFlow [t]["RCH"][n + k*(BAS.nrow*BAS.ncol)] = q;
-                if (q>0){
-                  OUT.vbSumIn [t]["RCH"]+=q;
-                }
-                else{
-                  OUT.vbSumOut [t]["RCH"]-=q;
-                }
-                k=BAS.nlay; // move on to next horizontal location
+          for (var p=0; p<data.irch.length; p++){
+            if ((v = checkIfArray(data.irch[p], BAS.nrow)) != "ok")
+              badinput("Problem with RCH.irch["+p+"] -- " + v);
+            for (var i=0; i<data.irch[p].length; i++){
+              if ((v = checkIfArray(data.irch[p][i], BAS.ncol)) != "ok")
+                badinput("Problem with RCH.irch["+p+"]["+i+"] -- " + v); 
+              for (var j=0; j<data.irch[p][i].length; j++){
+                if ((v = checkIfInt(data.irch[p][i][j])) != "ok")
+                  badinput("Problem with RCH.irch["+p+"]["+i+"]["+j+"] -- " + v);
+                if (data.irch[p][i][j] < 1 || data.irch[p][i][j] > BAS.nlay)
+                  badinput("Problem with RCH.irch["+p+"]["+i+"]["+j+"] -- Value is not a valid layer number.");
               }
-              
+            }
+          }
+        
+        }
+        
+      }
+      
+      if (key == "rech"){
+        data.rech = value;
+        
+        // Validate rech  
+        var v;
+      
+        if ((v = checkIfArray(data.rech, BAS.periods.length)) != "ok")
+          badinput("Problem with RCH.rech -- " + v);
+        
+        for (var p=0; p<data.rech.length; p++){
+          if ((v = checkIfArray(data.rech[p], BAS.nrow)) != "ok")
+            badinput("Problem with RCH.rech["+p+"] -- " + v);
+          for (var i=0; i<data.rech[p].length; i++){
+            if ((v = checkIfArray(data.rech[p][i], BAS.ncol)) != "ok")
+              badinput("Problem with RCH.rech["+p+"]["+i+"] -- " + v); 
+            for (var j=0; j<data.rech[p][i].length; j++){
+              if ((v = checkIfNumber(data.rech[p][i][j])) != "ok")
+                badinput("Problem with RCH.rech["+p+"]["+i+"]["+j+"] -- " + v);
+            }
+          }
+        }
+        
+      }
+    }
+    
+    return {
+      get: getData,
+      set: setData,
+      subroutines: {
+    
+        "AllocateRead" : function(input){
+          
+          setData("nrchop", input.RCH.nrchop)
+          setData("irch", input.RCH.irch)
+          setData("rech", input.RCH.rech)
+          
+          // initialize calc array
+          for (var ir=0; ir<BAS.nrow; ir++){
+            data.calc[ir]=[];
+            for (var ic=0; ic<BAS.ncol; ic++){
+              data.calc[ir][ic]=0
+            }
+          }
+          
+        }
+        ,
+        "ReadPrepare" : function(kper){
+          
+          // C4 - MULTIPLY RECHARGE RATE BY CELL AREA TO GET VOLUMETRIC RATE.
+          for (var ir=0; ir<BAS.nrow; ir++){
+            for (var ic=0; ic<BAS.ncol; ic++){
+              data.calc[ir][ic] = data.rech[kper][ir][ic] * BAS.delr[ic]*BAS.delc[ir];
+            }
+          }
+          
+          // C5 - IF NRCHOP=2 THEN A LAYER INDICATOR ARRAY IS NEEDED.  TEST INIRCH
+          // C5 - TO SEE HOW TO DEFINE IRCH.
+          if (data.nrchop == 2){
+            
+            
+            // C5B - INIRCH=>0, SO CALL U2DINT TO READ LAYER INDICATOR ARRAY(IRCH)
+            for (var ir=0; ir<BAS.nrow; ir++){
+              for (var ic=0; ic<BAS.ncol; ic++){
+                if (data.irch[kper][ir][ic] < 1 || data.irch[kper][ir][ic] > BAS.nlay ){
+                  throw "INVALID LAYER NUMBER IN IRCH FOR COLUMN "+ic+"  ROW "+ir+"  : "+data.irch[kper][ir][ic];
+                }
+              }
             }
             
           }
+          
         }
+        ,
+        "Formulate" : function(kiter, kstp, kper){
+          
+          // C2 - DETERMINE WHICH RECHARGE OPTION.
+          
+          if (data.nrchop == 1){
+            // C3 - NRCHOP IS 1, SO RECHARGE IS IN TOP LAYER. LAYER INDEX IS 1.
+            for (var ir=0; ir<BAS.nrow; ir++){
+              for (var ic=0; ic<BAS.ncol; ic++){
+                if (BAS.ibound[0][ir][ic] > 0){
+                  BAS.rhs[0][ir][ic] -= data.calc[ir][ic];
+                }
+                continue;
+              }
+            }
+          }
+          
+          if (data.nrchop == 2){
+            // C4 - NRCHOP IS 2, SO RECHARGE IS INTO LAYER IN INDICATOR ARRAY
+            for (var ir=0; ir<BAS.nrow; ir++){
+              for (var ic=0; ic<BAS.ncol; ic++){
+                var il = data.irch[kper][ir][ic] - 1;
+                if (il<0) continue;
+                if (BAS.ibound[il][ir][ic] > 0){
+                  BAS.rhs[il][ir][ic] -= data.calc[ir][ic];
+                }
+                continue;
+              }
+            }
+          }
+          
+          if (data.nrchop == 3){
+            // C5 - NRCHOP IS 3, RECHARGE IS INTO HIGHEST VARIABLE-HEAD CELL, EXCEPT
+            // C5 - CANNOT PASS THROUGH CONSTANT HEAD NODE
+            for (var ir=0; ir<BAS.nrow; ir++){
+              for (var ic=0; ic<BAS.ncol; ic++){
+                for (var il=0; il<BAS.nlay; il++){
+                  // C5A - IF CELL IS CONSTANT HEAD MOVE ON TO NEXT HORIZONTAL LOCATION.
+                  if (BAS.ibound[il][ir][ic] < 0){ il=BAS.nlay; continue; }
+                  
+                  if (BAS.ibound[il][ir][ic] > 0){
+                    BAS.rhs[il][ir][ic] -= data.calc[ir][ic];
+                    il=BAS.nlay; continue;
+                  }
+                  
+                }
+              }
+            }
+          }
+          
+          
+        }
+        ,
+        "WaterBudget" : function(kstp, kper){
+          
+          var t = BAS.tstp;
+          
+          var ncel = BAS.nrow * BAS.ncol * BAS.nlay;
+          OUT.ccFlow [t]["RCH"] = new Float32Array(ncel);
+          OUT.vbSumIn [t]["RCH"] = 0;  
+          OUT.vbSumOut [t]["RCH"] = 0;
+          
+          //C4 - DETERMINE THE RECHARGE OPTION.
+          if (data.nrchop==1){
+            // C5 - NRCHOP=1, SO RECH GOES INTO LAYER 1. PROCESS EACH HORIZONTAL
+            // C5 - CELL LOCATION.
+            var n=0;
+            for (var i=0; i<BAS.nrow; i++){
+              for (var j=0; j<BAS.ncol; j++,n++){
+                // C5A - IF CELL IS VARIABLE HEAD, THEN DO BUDGET FOR IT.
+                if (BAS.ibound[0][i][j] > 0){
+                  var q = data.calc[i][j];
+                  OUT.ccFlow [t]["RCH"][n] = q;
+                  if (q>0){
+                    OUT.vbSumIn [t]["RCH"]+=q;
+                  }
+                  else{
+                    OUT.vbSumOut [t]["RCH"]-=q;
+                  }
+                }
+              }
+            }
+          }
+          else if (data.nrchop==2){
+            // C6 - NRCHOP=2, RECH IS IN LAYER SPECIFIED IN INDICATOR ARRAY(IRCH).
+            // C6 - PROCESS EACH HORIZONTAL CELL LOCATION.
+            var n=0;
+            for (var i=0; i<BAS.nrow; i++){
+              for (var j=0; j<BAS.ncol; j++,n++){
+                // C6A - GET LAYER INDEX FROM INDICATOR ARRAY(IRCH).
+                var il = data.irch[kper][i][j]-1;
+                // C6B - IF CELL IS VARIABLE HEAD, THEN DO BUDGET FOR IT.
+                if (BAS.ibound[il][i][j] > 0){
+                  var q = data.calc[i][j];
+                  OUT.ccFlow [t]["RCH"][n+il*(BAS.nrow*BAS.ncol)] = q;
+                  if (q>0){
+                    OUT.vbSumIn [t]["RCH"]+=q;
+                  }
+                  else{
+                    OUT.vbSumOut [t]["RCH"]-=q;
+                  }
+                }
+              }
+            }
+          }
+          else if (data.nrchop==3){
+            // C7 - NRCHOP=3; RECHARGE IS INTO HIGHEST CELL IN A VERTICAL COLUMN
+            // C7 - THAT IS NOT NO FLOW.  PROCESS EACH HORIZONTAL CELL LOCATION.
+            var n=0;
+            for (var i=0; i<BAS.nrow; i++){
+              for (var j=0; j<BAS.ncol; j++,n++){
+              
+                // C7A - INITIALIZE IRCH TO 1, AND LOOP THROUGH CELLS IN A VERTICAL
+                // C7A - COLUMN TO FIND WHERE TO PLACE RECHARGE.
+                for (var k=0; k<BAS.nlay; k++){
+                
+                  // C7B - IF CELL IS CONSTANT HEAD, MOVE ON TO NEXT HORIZONTAL LOCATION.
+                  if (BAS.ibound[k][i][j] < 0) break;
+                  
+                  if (BAS.ibound[k][i][j] > 0){
+                
+                    var q = data.calc[i][j];
+                    OUT.ccFlow [t]["RCH"][n + k*(BAS.nrow*BAS.ncol)] = q;
+                    if (q>0){
+                      OUT.vbSumIn [t]["RCH"]+=q;
+                    }
+                    else{
+                      OUT.vbSumOut [t]["RCH"]-=q;
+                    }
+                    k=BAS.nlay; // move on to next horizontal location
+                  }
+                  
+                }
+                
+              }
+            }
+          }
+          
+          OUT.vbSumIn [t]["RCH"] *= BAS.delt;  
+          OUT.vbSumOut [t]["RCH"] *= BAS.delt;
+          
+        }
+        ,
+        "DeallocateMemory" : function(){}
       }
-      
-      OUT.vbSumIn [t]["RCH"] *= BAS.delt;  
-      OUT.vbSumOut [t]["RCH"] *= BAS.delt;
-      
-    }
-    RCH.DeallocateMemory = function(){}
+    } // end return
     
-    return RCH;
   }());
   
+  
   var RIV = (function(){ // V!
-    var RIV = {};
-    RIV.data = [] // array of stresses for each stress period
+
+    var data = {
+      bounds: []
+    };
     
-    RIV.AllocateRead = function(input){
-      RIV.data = input.RIV.data;
+    /** Allow the data used by this package to be accessed by other packages or external code */
+    var getData = function(key){
+      // If the key argument was not provided, return all the data
+      if (typeof key == "undefined"){
+        return data;
+      }
+      // If a valid key argument was provided, return the desired data
+      if (data.hasOwnProperty(key)){
+        return data[key];
+      }
+      // If neither of the above, throw an error
+      throw "Could not find item "+ key +" in the RIV package";
+    }
+    
+    /** Allow the data used by this package to be set by other packages or external code */
+    var setData = function(key, value){
       
-      // Some validation
-      //
-      var v;
-      if ((v = checkIfArray(RIV.data, BAS.periods.length)) != "ok")
-        badinput("Problem with RIV.data -- " + v);
-      
-      for (var p=0; p<RIV.data.length; p++){
+      if (key == "bounds"){
+
+        data.bounds = value;
+        var bounds = data.bounds;
         
-        if ((v = checkIfArray(RIV.data[p])) != "ok")
-          badinput("Problem with RIV.data["+p+"] -- " + v);
+        
+        // Some validation
+        //
+        var v;
+        if ((v = checkIfArray(bounds, BAS.periods.length)) != "ok")
+          badinput("Problem with RIV.data -- " + v);
+        
+        for (var p=0; p<bounds.length; p++){
           
-        for (var a=0; a<RIV.data[p].length; a++){
-          
-          if ((v = checkIfInt(RIV.data[p][a].layer)) != "ok")
-            badinput("Problem with RIV.data["+p+"]["+a+"].layer -- " + v);
-          if (RIV.data[p][a].layer <= 0 || RIV.data[p][a].layer > BAS.nlay)
-            badinput("Problem with RIV.data["+p+"]["+a+"].layer -- Value is too large or too small to be a layer number.");
-          if ((v = checkIfInt(RIV.data[p][a].row)) != "ok")
-            badinput("Problem with RIV.data["+p+"]["+a+"].row -- " + v);
-          if (RIV.data[p][a].row <= 0 || RIV.data[p][a].row > BAS.nrow)
-            badinput("Problem with RIV.data["+p+"]["+a+"].row -- Value is too large or too small to be a row number.");
-          if ((v = checkIfInt(RIV.data[p][a].column)) != "ok")
-            badinput("Problem with RIV.data["+p+"]["+a+"].column -- " + v);
-          if (RIV.data[p][a].column <= 0 || RIV.data[p][a].column > BAS.ncol)
-            badinput("Problem with RIV.data["+p+"]["+a+"].column -- Value is too large or too small to be a column number.");
-          if ((v = checkIfNumber(RIV.data[p][a].conductance)) != "ok")
-            badinput("Problem with RIV.data["+p+"]["+a+"].conductance -- " + v);
-          if ((v = checkIfNumber(RIV.data[p][a].riverbottom)) != "ok")
-            badinput("Problem with RIV.data["+p+"]["+a+"].riverbottom -- " + v);
+          if ((v = checkIfArray(bounds[p])) != "ok")
+            badinput("Problem with RIV.data["+p+"] -- " + v);
             
+          for (var a=0; a<bounds[p].length; a++){
+            
+            if ((v = checkIfInt(bounds[p][a].layer)) != "ok")
+              badinput("Problem with RIV.data["+p+"]["+a+"].layer -- " + v);
+            if (bounds[p][a].layer <= 0 || bounds[p][a].layer > BAS.nlay)
+              badinput("Problem with RIV.data["+p+"]["+a+"].layer -- Value is too large or too small to be a layer number.");
+            if ((v = checkIfInt(bounds[p][a].row)) != "ok")
+              badinput("Problem with RIV.data["+p+"]["+a+"].row -- " + v);
+            if (bounds[p][a].row <= 0 || bounds[p][a].row > BAS.nrow)
+              badinput("Problem with RIV.data["+p+"]["+a+"].row -- Value is too large or too small to be a row number.");
+            if ((v = checkIfInt(bounds[p][a].column)) != "ok")
+              badinput("Problem with RIV.data["+p+"]["+a+"].column -- " + v);
+            if (bounds[p][a].column <= 0 || bounds[p][a].column > BAS.ncol)
+              badinput("Problem with RIV.data["+p+"]["+a+"].column -- Value is too large or too small to be a column number.");
+            if ((v = checkIfNumber(bounds[p][a].conductance)) != "ok")
+              badinput("Problem with RIV.data["+p+"]["+a+"].conductance -- " + v);
+            if ((v = checkIfNumber(bounds[p][a].riverbottom)) != "ok")
+              badinput("Problem with RIV.data["+p+"]["+a+"].riverbottom -- " + v);
+              
+          }
         }
         
       }
       
       
     }
-    RIV.ReadPrepare = function(){
-      // nothing
-    }
-    RIV.Formulate = function(kiter, kstp, kper){
       
-      if ( RIV.data[kper].length == 0 ) return;
-      
-      for (var a=0; a<RIV.data[kper].length; a++){
+
+
+    return {
+      get: getData,
+      set: setData,
+      subroutines: {
         
-        var ir = RIV.data[kper][a].row-1; 
-        var ic = RIV.data[kper][a].column-1; 
-        var il = RIV.data[kper][a].layer-1;
-        
-        // C4 - IF THE CELL IS EXTERNAL SKIP IT.
-        if (BAS.ibound[il][ir][ic] > 0){
+        "AllocateRead" : function(input){
           
-          // C5 - SINCE THE CELL IS INTERNAL GET THE RIVER DATA.
-          var hriv = RIV.data[kper][a].stage;
-          var criv = RIV.data[kper][a].conductance;
-          var rbot = RIV.data[kper][a].riverbottom;
+          setData("bounds", input.RIV.data);
           
-          // C6 - COMPARE AQUIFER HEAD TO BOTTOM OF STREAM BED.
-          if (BAS.hnew[il][ir][ic] > rbot){
-            // C7 - SINCE HEAD>BOTTOM ADD TERMS TO RHS AND HCOF.
-            BAS.rhs[il][ir][ic] -= criv*hriv;
-            BAS.hcof[il][ir][ic] -= criv;
-          }
-          else{
-            //C8 - SINCE HEAD<BOTTOM ADD TERM ONLY TO RHS.
-            BAS.rhs[il][ir][ic] -= criv*(hriv-rbot)
+        }
+        ,
+        "ReadPrepare" : function(){
+          // nothing
+        }
+        ,
+        "Formulate" : function(kiter, kstp, kper){
+          var bounds = data.bounds;
+          
+          if ( bounds[kper].length == 0 ) return;
+          
+          for (var a=0; a<bounds[kper].length; a++){
+            
+            var ir = bounds[kper][a].row-1; 
+            var ic = bounds[kper][a].column-1; 
+            var il = bounds[kper][a].layer-1;
+            
+            // C4 - IF THE CELL IS EXTERNAL SKIP IT.
+            if (BAS.ibound[il][ir][ic] > 0){
+              
+              // C5 - SINCE THE CELL IS INTERNAL GET THE RIVER DATA.
+              var hriv = bounds[kper][a].stage;
+              var criv = bounds[kper][a].conductance;
+              var rbot = bounds[kper][a].riverbottom;
+              
+              // C6 - COMPARE AQUIFER HEAD TO BOTTOM OF STREAM BED.
+              if (BAS.hnew[il][ir][ic] > rbot){
+                // C7 - SINCE HEAD>BOTTOM ADD TERMS TO RHS AND HCOF.
+                BAS.rhs[il][ir][ic] -= criv*hriv;
+                BAS.hcof[il][ir][ic] -= criv;
+              }
+              else{
+                //C8 - SINCE HEAD<BOTTOM ADD TERM ONLY TO RHS.
+                BAS.rhs[il][ir][ic] -= criv*(hriv-rbot)
+              }
+              
+            }
+            
           }
           
         }
-        
-      }
-      
-    }
-    RIV.WaterBudget = function(kstp, kper){
-      var t = BAS.tstp;
-      
-      var ncel = BAS.nrow * BAS.ncol * BAS.nlay;
-      OUT.ccFlow [t]["RIV"] = new Float32Array(ncel);
-      OUT.vbSumIn [t]["RIV"] = 0;  
-      OUT.vbSumOut [t]["RIV"] = 0;
-      
-      // C5 - LOOP THROUGH EACH RIVER REACH CALCULATING FLOW.
-      for (var a=0; a<RIV.data[kper].length; a++){
-      
-        // C5A - GET LAYER, ROW & COLUMN OF CELL CONTAINING REACH.
-        var ir = RIV.data[kper][a].row-1; 
-        var ic = RIV.data[kper][a].column-1; 
-        var il = RIV.data[kper][a].layer-1; 
-        var q = 0;
-        
-        var n = ic + ir*BAS.ncol + il*BAS.ncol*BAS.nrow;
-        
-        // C5B - IF CELL IS NO-FLOW OR CONSTANT-HEAD MOVE ON TO NEXT REACH.
-        if (BAS.ibound[il][ir][ic] > 0){
+        ,
+        "WaterBudget" : function(kstp, kper){
+          var bounds = data.bounds;
+          var t = BAS.tstp;
           
-          // C5C - GET RIVER PARAMETERS FROM RIVER LIST.
-          var hriv = RIV.data[kper][a].stage;
-          var criv = RIV.data[kper][a].conductance;
-          var rbot = RIV.data[kper][a].riverbottom;
-          var hnew = BAS.hnew[il][ir][ic];
+          var ncel = BAS.nrow * BAS.ncol * BAS.nlay;
+          OUT.ccFlow [t]["RIV"] = new Float32Array(ncel);
+          OUT.vbSumIn [t]["RIV"] = 0;  
+          OUT.vbSumOut [t]["RIV"] = 0;
           
-          // C5D - COMPARE HEAD IN AQUIFER TO BOTTOM OF RIVERBED.
-          if (hnew > rbot){
-            // C5E - AQUIFER HEAD > BOTTOM THEN RATE=CRIV*(HRIV-HNEW).
-            q = criv*hriv - criv*hnew;
-          }
-          else{
-            // C5F - AQUIFER HEAD < BOTTOM THEN RATE=CRIV*(HRIV-RBOT).
-            q = criv*(hriv-rbot);
-          }
+          // C5 - LOOP THROUGH EACH RIVER REACH CALCULATING FLOW.
+          for (var a=0; a<bounds[kper].length; a++){
           
-          OUT.ccFlow [t]["RIV"][n] = q;
-          if (q>0){
-            OUT.vbSumIn [t]["RIV"]+=q;
+            // C5A - GET LAYER, ROW & COLUMN OF CELL CONTAINING REACH.
+            var ir = bounds[kper][a].row-1; 
+            var ic = bounds[kper][a].column-1; 
+            var il = bounds[kper][a].layer-1; 
+            var q = 0;
+            
+            var n = ic + ir*BAS.ncol + il*BAS.ncol*BAS.nrow;
+            
+            // C5B - IF CELL IS NO-FLOW OR CONSTANT-HEAD MOVE ON TO NEXT REACH.
+            if (BAS.ibound[il][ir][ic] > 0){
+              
+              // C5C - GET RIVER PARAMETERS FROM RIVER LIST.
+              var hriv = bounds[kper][a].stage;
+              var criv = bounds[kper][a].conductance;
+              var rbot = bounds[kper][a].riverbottom;
+              var hnew = BAS.hnew[il][ir][ic];
+              
+              // C5D - COMPARE HEAD IN AQUIFER TO BOTTOM OF RIVERBED.
+              if (hnew > rbot){
+                // C5E - AQUIFER HEAD > BOTTOM THEN RATE=CRIV*(HRIV-HNEW).
+                q = criv*hriv - criv*hnew;
+              }
+              else{
+                // C5F - AQUIFER HEAD < BOTTOM THEN RATE=CRIV*(HRIV-RBOT).
+                q = criv*(hriv-rbot);
+              }
+              
+              OUT.ccFlow [t]["RIV"][n] = q;
+              if (q>0){
+                OUT.vbSumIn [t]["RIV"]+=q;
+              }
+              else{
+                OUT.vbSumOut [t]["RIV"]-=q;
+              }
+            }
           }
-          else{
-            OUT.vbSumOut [t]["RIV"]-=q;
-          }
+        
+          OUT.vbSumIn [t]["RIV"] *= BAS.delt;  
+          OUT.vbSumOut [t]["RIV"] *= BAS.delt;
         }
+        ,
+        "Output" : function(){}
+        ,
+        "DeallocateMemory" : function(){}
+        
       }
+    } // end return
     
-      OUT.vbSumIn [t]["RIV"] *= BAS.delt;  
-      OUT.vbSumOut [t]["RIV"] *= BAS.delt;
-    
-    }
-    RIV.Output = function(){}
-    RIV.DeallocateMemory = function(){}
-    
-    return RIV;
   }());
   
   var EVT = (function(){ // V!
@@ -2987,7 +3080,7 @@ var MODFLOW2005 = function( input ){
         return data[key];
       }
       // If neither of the above, throw an error
-      throw "Could not find item "+ key +" in the GHB package";
+      throw "Could not find item "+ key +" in the EVT package";
     }
     
     /** Allow the data used by this package to be set by other packages or external code */
