@@ -14,10 +14,304 @@
   
   </style>
   
-  <script src="../js/MODFLOW2005.js"></script>
-  <script src="../js/PreProcessor.js"></script>
+  <script src="../MODFLOW2005.js"></script>
+  <script>
+
+var PreProcessor = function(inputJSON){
   
-  <script src="../js/plotly.min.js"></script>
+  var features = [];
+  
+  /*  addFeatures *************************************************************
+   *
+   *  Add an array of feature objects. A feature object specifies some model 
+   *  properties or boundary conditions that will be applied to the area 
+   *  defined by some point, line, or polygon geometry.
+   */
+  var addFeatures = function(newFeatures){
+    for (var i=0; i<newFeatures.length; i++){
+      features.push(newFeatures[i]);
+    }
+  }
+  
+  /*  getFeatures  ************************************************************
+   * 
+   *  Return the array of features.
+   */
+  var getFeatures = function(){
+    return features;
+  }
+  
+  /*  toJSON ******************************************************************
+   *  
+   *  Return a model JSON object with model properties and boundary conditions
+   *  set by the features.
+   */
+  var toJSON = function(){
+    
+    // Sart with a clone of the input JSON
+    var json = Object.create(inputJSON);
+    
+    
+    
+    // Process each feature:
+    for (var f=0; f<features.length; f++){
+      var geom = features[f].geometry;
+      var datas = features[f].data;
+      
+      // Identify the intersecting cells:
+      var cells = [];
+      if (geom.type == 'point'   ) cells = getCellsIntersectingPoint(geom.points);
+      if (geom.type == 'polyline') cells = getCellsIntersectingPolyline(geom.points);
+      
+      // Process the data
+      for (var d=0; d<datas.length; d++){
+        var data = datas[d];
+        if (data.module == 'WEL') addWEL(json, cells, data);
+        if (data.module == 'GHB') addGHB(json, cells, data);
+      }
+    }
+    
+    return json;
+  }
+  
+  // todo
+  /*  transformPoints *********************************************************
+   *  
+   *  transform the points to the grid's datum (so x increases to the right 
+   *  along rows, y increases down along columns).
+   */
+  var transformPoints = function(points){
+    var newPoints = [];
+    
+    var topleftXY = [0,0];             // todo
+    var topleftClwRotation = 0;        // todo
+    
+    
+    for (var i=0; i<points.length; i++){
+      var pnt = points[i];
+      
+      x = pnt[0] - topleftXY[0];
+      y = pnt[1] - topleftXY[1];
+      
+      x =   x*Math.cos(topleftClwRotation) + y*Math.sin(topleftClwRotation) 
+      y = - x*Math.sin(topleftClwRotation) + y*Math.cos(topleftClwRotation) 
+      
+      newPoints[i] = [x,y];
+    }
+    
+    return newPoints
+    
+  }
+  
+  
+  /* */
+  var getCellsIntersectingPoint = function(point){
+    
+  }
+  
+  /* */
+  var getCellsIntersectingPolyline = function(points){
+    
+    var cellsDict = {};
+    var addCell = function(i, j, length){
+      var ij = i+','+j
+      if (cellsDict.hasOwnProperty(ij)){
+        cellsDict[ij].data.length += length;
+      }
+      else{
+        cellsDict[ij] = {
+          I:i+1, 
+          J:j+1,
+          data:{
+            length: length
+          }
+        }
+      }
+    }
+    var getCells = function(){
+      var cells = [];
+      for (var ij in cellsDict){
+        if (cellsDict.hasOwnProperty(ij)){
+          cells.push( cellsDict[ij] );
+        }
+      }
+      return cells;
+    }
+    
+    
+    
+    var delr = inputJSON.DIS.delr; // cell widths along rows
+    var delc = inputJSON.DIS.delc; // cell widths along columns
+    
+    var ncol = delc.length;
+    var nrow = delr.length;
+    
+    var cx=[]; // x coordinate of right side along each column
+    var ry=[]; // y coordinate of bottom side along each row
+    for (var i=0, y=0; i<ncol; i++ ){y+=delc[i]; ry[i]=y};
+    for (var j=0, x=0; j<nrow; j++ ){x+=delr[j]; cx[j]=x};
+    
+    
+    
+    // 1st - transform the polyline to the grid's datum 
+    // (x is along rows, y is along cols)
+    points = transformPoints(points);
+    
+    for (var p=0; p<points.length-1; p++){
+      
+      var pntA = points[p];
+      var pntB = points[p+1];
+      
+      
+      // Get the i,j index of the cell containing pntA
+      var j=-1;
+      var pntAxInBounds = pntA[0] >= 0 && pntA[0] <= cx[ncol-1];
+      if(pntAxInBounds){
+        for (var j=0, xx=0; j<delr.length && xx+delr[j]<pntA[0]; xx+=delr[j++] ){}
+      }
+      var i=-1;
+      var pntAyInBounds = pntA[1] >= 0 && pntA[1] <= ry[nrow-1];
+      if (pntAyInBounds){
+        for (var i=0, yy=0; i<delc.length && yy+delc[i]<pntA[1]; yy+=delc[i++] ){}
+      }
+      
+      
+      
+      cnt = 0
+      while(cnt <100){ // todo
+        cnt++
+        var dist_pntB = Math.sqrt((pntB[0]-pntA[0])*(pntB[0]-pntA[0]) 
+                                + (pntB[1]-pntA[1])*(pntB[1]-pntA[1]));
+        
+        
+        var dir = [(pntB[0]-pntA[0])/dist_pntB, (pntB[1]-pntA[1])/dist_pntB];
+        
+        
+        // Calculate distance along the vector to the next row & next col
+        var dist_right = (cx[j  ] - pntA[0]) / dir[0];
+        var dist_left  = ((j>0?cx[j-1]:0) - pntA[0]) / dir[0];
+        var dist_up    = (ry[i  ] - pntA[1]) / dir[1];
+        var dist_down  = ((i>0?ry[i-1]:0) - pntA[1]) / dir[1];
+        
+        // ... handle cases where pntA is outside the model area
+        if (pntA[0] < 0){ 
+          dist_right = (0 - pntA[0])/ dir[0]; 
+          dist_left = Infinity; 
+        }
+        if (pntA[0] > cx[ncol-1]){ 
+          dist_right = Infinity;
+          dist_left = (cx[ncol-1] - pntA[0])/ dir[0]; 
+        }
+        if (pntA[1] < 0){ 
+          dist_down = (0 - pntA[1])/ dir[1]; 
+          dist_up = Infinity; 
+        }
+        if (pntA[1] > ry[nrow-1]){ 
+          dist_down = Infinity;
+          dist_up = (ry[nrow-1] - pntA[1])/ dir[1]; 
+        }
+        
+        var minDist = dist_pntB;
+        var nextStep = 'next-point';
+        if ( dist_right > 0 && dist_right < minDist ){
+          minDist = dist_right; 
+          nextStep = 'right'; 
+        }
+        if ( dist_left > 0 && dist_left < minDist ){
+          minDist = dist_left; 
+          nextStep = 'left'; 
+        }
+        if ( dist_up > 0 && dist_up < minDist ){
+          minDist = dist_up; 
+          nextStep = 'up'; 
+        }
+        if ( dist_down > 0 && dist_down < minDist ){
+          minDist = dist_down; 
+          nextStep = 'down'; 
+        }
+        
+        // console.log(nextStep, minDist)
+        
+        if (pntA[0] >= 0 && pntA[0] <= cx[ncol-1]
+        &&  pntA[1] >= 0 && pntA[1] <= ry[nrow-1] ){
+          addCell(i,j, minDist);
+        }
+        
+        if (nextStep == 'next-point'){
+          break; // while
+        }
+        var newX = pntA[0] + minDist*dir[0]
+        var newY = pntA[1] + minDist*dir[1]
+        pntA = [newX, newY];
+        
+        if (nextStep == 'right'){
+          j++;
+        }
+        if (nextStep == 'left'){
+          if (j==-1){j = ncol}
+          j--;
+        }
+        if (nextStep == 'down'){
+          i++;
+        }
+        if (nextStep == 'up'){
+          if (i==-1){i = nrow}
+          i--;
+        }
+        
+      }
+    }
+    
+    //console.log(getCells())
+    
+    return getCells();
+    
+    
+  }
+  
+  
+  var addWEL = function(json, cells, data){
+    json.WEL = json.WEL || {data:[[]]}
+    var welData = json.WEL.data[0];
+    for (var a=0; a<cells.length; a++){
+      welData.push({
+        layer:    parseInt(data.layer),
+        row:      cells[a].I,
+        column:   cells[a].J,
+        q:        parseFloat(data.q)
+      });
+    }
+  }
+  
+  var addGHB = function(json, cells, data){
+    json.GHB = json.GHB || {data:[[]]}
+    var ghbData = json.GHB.data[0];
+    for (var a=0; a<cells.length; a++){
+      ghbData.push({
+        layer:    parseInt(data.layer),
+        row:      cells[a].I,
+        column:   cells[a].J,
+        bhead:    parseFloat(data.bhead),
+        cond:     parseFloat(data.cond)
+      });
+    }
+  }
+  
+  
+  /* *********************************************************************** */
+  return {
+    addFeatures: addFeatures,
+    getFeatures: getFeatures,
+    toJSON: toJSON
+    
+    // for testing:
+    , getCellsIntersectingPolyline: getCellsIntersectingPolyline
+    
+  };
+}
+  </script>
+  
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   
   <!-- Model runs and Charts -->
   <script> 
@@ -92,10 +386,10 @@ var setup = function(){
       ],
       "periods": [
         {
-          "perlen": tstep,          // PERLENóis the length of a stress period
-          "nstp": 1,            // NSTPóis the number of time steps in a stress period
-          "tsmult": 1,          // TSMULTóis the multiplier for the length of successive time steps. The length of a time step is calculated by multiplying the length of the previous time step by tsmult
-          "issflg": false        // boolean variable that indicates whether the stress period is transient or steady state. True is ìsteady-stateî and false is ìtransientî
+          "perlen": tstep,          // PERLEN‚Äîis the length of a stress period
+          "nstp": 1,            // NSTP‚Äîis the number of time steps in a stress period
+          "tsmult": 1,          // TSMULT‚Äîis the multiplier for the length of successive time steps. The length of a time step is calculated by multiplying the length of the previous time step by tsmult
+          "issflg": false        // boolean variable that indicates whether the stress period is transient or steady state. True is ‚Äústeady-state‚Äù and false is ‚Äútransient‚Äù
         }
       ]
     },
@@ -123,7 +417,7 @@ var setup = function(){
           "hy": constant2DArray(rows, cols, hk),
           "sc1":constant2DArray(rows, cols, ss), // 
           "sc2":constant2DArray(rows, cols, sy), // 
-          "trpy": 1 // TRPYóis a one-dimensional variable containing a horizontal anisotropic factor for each layer and is the ratio of
+          "trpy": 1 // TRPY‚Äîis a one-dimensional variable containing a horizontal anisotropic factor for each layer and is the ratio of
                       // transmissivity or hydraulic conductivity (whichever is being used) along a column to transmissivity or hydraulic
                       // conductivity along a row. Set to 1.0 for isotropic conditions.
         }
