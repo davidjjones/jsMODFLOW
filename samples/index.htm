@@ -1,0 +1,567 @@
+<!doctype html>
+<html>
+<head>
+  <title>Drawdown Cone</title>
+  <style>
+  html, body {
+    width:100%;
+    height:100%;
+    padding:0px;
+    margin:0px;
+  }
+  
+  
+  
+  </style>
+  
+  <script src="../js/MODFLOW2005.js"></script>
+  <script src="../js/PreProcessor.js"></script>
+  
+  <script src="../js/plotly.min.js"></script>
+  
+  <!-- Model runs and Charts -->
+  <script> 
+
+  
+var model;
+
+var wells=[];
+
+var wlChart;
+
+var isrunning = false;
+
+var constant2DArray = function(rows, cols, value){
+  var arr = [];
+  for (var i=0; i<rows; i++){
+    arr[i] = [];
+    for (var j=0; j<cols; j++){
+      arr[i][j] = value;
+    }
+  }
+  return arr;
+}
+
+var constant1DArray = function(cols, value){
+  var arr = [];
+  for (var j=0; j<cols; j++){
+    arr[j] = value;
+  }
+  return arr;
+}
+
+
+var init = function(){
+  
+  setup();
+  
+}
+
+var setup = function(){
+  
+  var rows = 60;
+  var cols = 60;
+  
+  
+  var hk    = parseFloat(document.getElementById("hk_tbx"      ).value)
+  var sy    = parseFloat(document.getElementById("sy_tbx"      ).value)
+  var ss    = parseFloat(document.getElementById("ss_tbx"      ).value)
+  var starting_head = 0
+  var top_elev = 0
+  var botm_elev = -parseFloat(document.getElementById("thickness_tbx"   ).value)
+  var width = parseFloat(document.getElementById("width_tbx"   ).value)
+  var tstep = parseFloat(document.getElementById("timestep_tbx").value)
+  
+  var cell_area = (width/rows) * (width/cols);
+  
+  var input_ss = { 
+    
+    "DIS":{
+      "nlay": 1,
+      "nrow": rows,
+      "ncol": cols,
+      "nper": 1,
+      "itmuni": "years",
+      "lenuni": "",
+      "delr": constant1DArray(rows, width/rows),
+      "delc": constant1DArray(cols, width/cols),
+      "elev": [
+        constant2DArray(rows, cols, top_elev) // Top
+        ,
+        constant2DArray(rows, cols, botm_elev) // Layer BOTM layer   1
+      ],
+      "periods": [
+        {
+          "perlen": tstep,          // PERLEN—is the length of a stress period
+          "nstp": 1,            // NSTP—is the number of time steps in a stress period
+          "tsmult": 1,          // TSMULT—is the multiplier for the length of successive time steps. The length of a time step is calculated by multiplying the length of the previous time step by tsmult
+          "issflg": false        // boolean variable that indicates whether the stress period is transient or steady state. True is “steady-state” and false is “transient”
+        }
+      ]
+    },
+    
+    "BAS":{
+      "ibound":[
+        constant2DArray(rows, cols, 1) // ibound, layer 1
+      ],
+      "hnoflo": 999.99,
+      "strt":[
+        constant2DArray(rows, cols, starting_head) // strt, layer 1
+      ]
+    },
+    
+    "BCF":{
+      "hdry"  : 1e30,
+      "iwdflg": false,
+      "wetfct": 0,
+      "iwetit": 0, 
+      "ihdwet": 0,
+      "layers":[
+        {
+          "layavg":0,
+          "laycon":3, // 0=confined, 1=water table, 2=limited convertable, 3= fully convertable
+          "hy": constant2DArray(rows, cols, hk),
+          "sc1":constant2DArray(rows, cols, ss), // 
+          "sc2":constant2DArray(rows, cols, sy), // 
+          "trpy": 1 // TRPY—is a one-dimensional variable containing a horizontal anisotropic factor for each layer and is the ratio of
+                      // transmissivity or hydraulic conductivity (whichever is being used) along a column to transmissivity or hydraulic
+                      // conductivity along a row. Set to 1.0 for isotropic conditions.
+        }
+      ]
+    },
+    
+    
+    "WEL": {
+      "data":[
+        [ //  Stress Period 1
+          //{"layer":3 , "row": 5 ,"column":11 , "q": -5},
+        ]
+      ]
+    },
+    
+    "GHB": {
+      "data":[[
+     //   {"layer":1 , "row": 1 ,"column":01 , "bhead":2, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":02 , "bhead":2.5, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":03 , "bhead":2.0, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":04 , "bhead":1.5, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":05 , "bhead":1.0, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":06 , "bhead":0.5, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":07 , "bhead":0, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":08 , "bhead":0, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":09 , "bhead":0, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":10 , "bhead":0, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":11 , "bhead":0, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":11 , "bhead":0, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":12 , "bhead":0, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":13 , "bhead":0, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":14 , "bhead":0, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":15 , "bhead":0, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":16 , "bhead":0, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":17 , "bhead":0, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":18 , "bhead":0, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":19 , "bhead":0, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":20 , "bhead":0, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":21 , "bhead":0, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":22 , "bhead":0, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":23 , "bhead":0, "cond":1e6 },
+     //   {"layer":1 , "row": 1 ,"column":24 , "bhead":0, "cond":1e6 }
+      ]]
+    },
+
+    "SIP":{
+      "mxiter": 50, // the maximum number of times through the iteration loop in one time step in an attempt to solve the system of finite-difference equations
+      "nparm": 5,   // the number of iteration variables to be used. Five variables are generally sufficient
+      "accl": 1,    // the acceleration variable, which must be greater than zero and is generally equal to one
+      "err": 0.001, // the head change criterion for convergence
+      "ipcalc": 0,  // flag indicating where the seed for calculating iteration variables will come from
+      "wseed": 0.001// the seed for calculating iteration variables
+    }
+    
+  };
+  
+  
+  var features = [
+    {
+      data: [
+        {
+          module: 'GHB',
+          layer: '1',
+          bhead: 0, 
+          cond: 1e6
+        }
+      ],
+      geometry: {
+        type: 'polyline',
+        points: [[0,100], [49900, 100]]
+      }
+    },
+    {
+      data: [
+        {
+          module: 'GHB',
+          layer: '1',
+          bhead: 0, 
+          cond: 1e6
+        }
+      ],
+      geometry: {
+        type: 'polyline',
+        points: [[0,49900], [49900, 49900]]
+      }
+    }
+  ]
+  
+  
+  var pre = PreProcessor(input_ss);
+  //pre.addFeatures(features)
+  input_ss = pre.toJSON()
+  
+  
+  model = new MODFLOW2005(input_ss);
+  
+   
+  try{
+    var results = model.run();
+  }
+  catch(err){
+    console.error(err)
+  }
+  
+  
+  wlChart = WaterLevel3DMap('ui');
+  
+  // remove wells array
+  
+  wells = [
+    {
+      layer: 1,
+      q: 0,
+      row: parseInt(rows*(Math.random()*.8+.1)),
+      column: parseInt(cols*(Math.random()*.8+.1))
+    },
+    {
+      layer: 1,
+      q: 0,
+      row: parseInt(rows*(Math.random()*.8+.1)),
+      column: parseInt(cols*(Math.random()*.8+.1))
+    },
+    {
+      layer: 1,
+      q: 0,
+      row: parseInt(rows*(Math.random()*.8+.1)),
+      column: parseInt(cols*(Math.random()*.8+.1))
+    },
+    {
+      layer: 1,
+      q: 0,
+      row: parseInt(rows*(Math.random()*.8+.1)),
+      column: parseInt(cols*(Math.random()*.8+.1))
+    },
+    {
+      layer: 1,
+      q: 0,
+      row: parseInt(rows*(Math.random()*.8+.1)),
+      column: parseInt(cols*(Math.random()*.8+.1))
+    }
+  ];
+  updateWells(); // get the q values set in the html
+  
+  // add to the model
+  model.WEL.data[0] = wells;  
+  
+  
+  document.getElementById('time_span').innerHTML = '0';
+  updateZrange();
+  
+}
+
+
+
+
+var xyToRowCol = function(x, y){
+  var row=1
+  var col=1;
+  var rowFract = 0;
+  var colFract = 0;
+  
+  for (var i=0; i<model.BAS.delr.length; i++){
+    var dx = model.BAS.delr[i];
+    if (x>=0 && dx>=x){
+      colFract = x/dx;
+      break;
+    }
+    col ++;
+    x -= dx;
+  }
+  for (var j=0; j<model.BAS.delc.length; j++){
+    var dy = model.BAS.delc[j];
+    if (y>=0 && dy>=y){
+      rowFract = y/dy;
+      break;
+    }
+    row ++;
+    y -= dy;
+  }
+  
+  return [row, col];
+}
+
+var runAStep = function(){
+  // model.WEL.data[0] = [];
+  // 
+  // // update WEL package
+  // var pumpingX = parseInt( document.getElementById('pumpingX_tbx').value )
+  // var pumpingY = parseInt( document.getElementById('pumpingY_tbx').value )
+  // var pumpingQ = parseInt( document.getElementById('pumpingQ_tbx').value ) * 43560
+  // if (!isNaN(pumpingX) &&!isNaN(pumpingY) &&!isNaN(pumpingQ) ){
+  //   model.WEL.data[0].push( {"layer":1 , "row": pumpingY ,"column": pumpingX , "q": pumpingQ} )
+  // }
+  
+  // run a transient time step
+  model.run();
+  wlChart.updateHeads();
+  
+  var time = parseFloat(document.getElementById('time_span').innerHTML);
+  time += model.BAS.periods[0].perlen;
+  time = 1*time.toPrecision(7);
+  document.getElementById('time_span').innerHTML = time;
+  
+}
+
+var startRunning = function(){
+  isrunning = true;
+  var fnt2repeat = function(){
+    runAStep();
+    startRunning.timer = setTimeout( fnt2repeat, 100);
+  }
+  fnt2repeat();
+}
+
+var stopRunning = function(){
+  isrunning = false;
+  timerId = startRunning.timer;
+  if (typeof timerId == "number"){
+    window.clearTimeout( timerId );
+  }
+}
+
+
+
+var WaterLevel3DMap = function(nodeId){
+
+  var title = "";
+  var data;
+  var layout = {
+    scene:{
+      aspectmode: 'manual', // auto | cube | data | manual
+      aspectratio: {x:1, y:1, z:0.3},
+      zaxis:{
+        range: [-20, 5]
+      }
+    },
+    margin:{
+      l:2,r:2,b:2,t:2
+    }
+    // title: title
+  };
+  var plotDiv = document.getElementById(nodeId);
+
+  var updateHeads = function(){
+    
+    // update the data object rather than creating a new one:
+    var z = data[0].z;
+    var n=0;
+    for (var i=0; i<model.BAS.delr.length; i++){
+      for (var j=0; j<model.BAS.delc.length; j++){
+        var value = model.OUT.head[0][n];
+        if (value > 1e20 ){ value = null }
+        z[i][j] = value
+        n++;
+      }
+    }
+    
+    Plotly.redraw(plotDiv);
+    
+  }
+  
+  var updateZMin = function(value){
+    layout.scene.zaxis.range[0] = value;
+    Plotly.redraw(plotDiv);
+  }
+  var updateZMax = function(value){
+    layout.scene.zaxis.range[1] = value;
+    Plotly.redraw(plotDiv);
+  }
+  
+  var resize = function(){
+    var gd3 = Plotly.d3.select(plotDiv).style({
+      'width': '100%',
+      'height': '100%',
+      'min-width': '500px',
+      'min-height': '500px'
+    });
+    Plotly.Plots.resize(gd3.node());
+  }
+  
+  var init = function(){
+    
+    
+    // make the contour plot
+    
+    // cell center x and y positions
+    ccx = [];
+    ccy = [];
+    
+    // compute the cell center coords:
+    for (var i=0, x=0, len=model.BAS.delc.length; i<len; i++){
+      ccx[i] = x + model.BAS.delc[i]/2;
+      x+=model.BAS.delc[i];
+    }
+    for (var i=0, y=0, len=model.BAS.delr.length; i<len; i++){
+      ccy[i] = y + model.BAS.delr[i]/2;
+      y+=model.BAS.delr[i];
+    }
+    
+    var z = [];
+    var n=0;
+    for (var i=0; i<model.BAS.delr.length; i++){
+      z[i] = [];
+      for (var j=0; j<model.BAS.delc.length; j++){
+        z[i][j] =  model.OUT.head[0][n];
+        n++;
+      }
+    }
+    
+    data = [{
+      z: z,
+      x: ccx,
+      y: ccy,
+      type: 'surface'// 'surface' // 'contour'
+      , colorscale: 'Jet'
+      , reversescale: true
+      , scene: 'scene'
+    }]
+    
+    var myPlot = Plotly.newPlot(plotDiv, data, layout, {displayModeBar: false});  
+    
+    var isPaused = false;
+    //plotDiv.on('plotly_click', function(data){
+    plotDiv.onmousedown = function(data){
+      if (isrunning){
+        isPaused = true;
+        stopRunning();
+      }
+    };
+    plotDiv.onmouseup = function(data){
+      if (isPaused){
+        isPaused = false;
+        startRunning();
+      }
+    };
+    
+    
+  }
+  
+  
+  init();
+  
+  return {
+    updateHeads: updateHeads,
+    updateScatterPnts: function(){},
+    resize: resize,
+    updateZMax: updateZMax,
+    updateZMin: updateZMin
+  }
+
+}
+
+
+var updateWells = function(){
+  
+  for (var i=1; i<=5; i++){
+    if (document.getElementById('w'+i+'-on').checked){
+      wells[i-1].q = parseFloat(document.getElementById('w'+i+'-q').value) * -43560;
+    }
+    else{
+      wells[i-1].q = 0;
+    }
+  }
+  
+}
+
+var updateZrange = function(){
+  wlChart.updateZMin(document.getElementById('chartZmin').value);
+  wlChart.updateZMax(document.getElementById('chartZmax').value);
+}
+
+  </script>
+  
+</head>
+<body onload="init();">
+  <h2 style="padding-left:10px;">Drawdown Cone Animation</h2>
+  <div style="height:240px; ">
+    <div style="position:relative; float:left; border: solid 1px black; width:auto; height:200px; padding:10px; margin-left:10px;">
+      <table>
+        <tbody>
+          <tr><td>Hydraulic Conductivity</td><td><input id="hk_tbx"           value="1000" style="width:40px;" />[ft/yr]</td></tr>
+          <tr><td>Specific Storage (When Confined)</td><td><input id="ss_tbx" value="0.001" style="width:40px;" /></td></tr>
+          <tr><td>Specific Yield         </td><td><input id="sy_tbx"          value="0.2" style="width:40px;" /></td></tr>
+          <tr><td>Aquifer Thickness     </td><td><input id="thickness_tbx"    value="100" style="width:40px;" />[ft]   </td></tr>
+          <tr><td>Aquifer Lateral Width </td><td><input id="width_tbx"        value="52800" style="width:40px;" />[ft]   </td></tr>
+          <tr><td>Simulation Time Step  </td><td><input id="timestep_tbx"     value="0.5" style="width:40px;" />[yr]   </td></tr>
+        </tbody>
+      </table>
+      <div style="position:absolute; padding:5px; bottom:0px;">
+        <input type="button" value="Update Properties" onclick="setup();"/>
+      </div>
+    </div>
+    
+    <div style="position:relative; float:left; border: solid 1px black; width:auto; height:200px; padding:10px; margin-left:10px;">
+      <table>
+        <tbody>
+          <tr>
+            <td>Well #1</td>
+            <td><input id="w1-on" type="checkbox" checked onchange="updateWells()" /></td>
+            <td><input id="w1-q" value="10" onchange="updateWells()" onkeyup="updateWells()" style="width:40px;" />[ac-ft/yr]</td>
+          </tr>
+          <tr>
+            <td>Well #2</td>
+            <td><input id="w2-on" type="checkbox" checked onchange="updateWells()" /></td>
+            <td><input id="w2-q" value="10" onchange="updateWells()" onkeyup="updateWells()" style="width:40px;" />[ac-ft/yr]</td>
+          </tr>
+          <tr>
+            <td>Well #3</td>
+            <td><input id="w3-on" type="checkbox" checked onchange="updateWells()" /></td>
+            <td><input id="w3-q" value="10" onchange="updateWells()" onkeyup="updateWells()" style="width:40px;" />[ac-ft/yr]</td>
+          </tr>
+          <tr>
+            <td>Well #4</td>
+            <td><input id="w4-on" type="checkbox" checked onchange="updateWells()" /></td>
+            <td><input id="w4-q" value="10" onchange="updateWells()" onkeyup="updateWells()" style="width:40px;" />[ac-ft/yr]</td>
+          </tr>
+          <tr>
+            <td>Well #5</td>
+            <td><input id="w5-on" type="checkbox" checked onchange="updateWells()" /></td>
+            <td><input id="w5-q" value="10" onchange="updateWells()" onkeyup="updateWells()" style="width:40px;" />[ac-ft/yr]</td>
+          </tr>
+        </tbody>
+      </table>
+      Chart Z Range: 
+      <input value="10" id="chartZmax" onchange="updateZrange();" style="width:30px;" /> -
+      <input value="-20" id="chartZmin" onchange="updateZrange();" style="width:30px;" />
+      
+      <div style="position:absolute; padding:5px; bottom:0px;"> 
+        Time [yrs]: <span id='time_span'>0</span><br/>
+        <button onclick="startRunning()">Start</button>
+        <button onclick="stopRunning()">Stop</button> 
+      </div>
+    </div>
+  
+  </div>
+  
+  
+  <div id="ui" style="height:600px; width:100%;"></div>
+
+</body>
+</html>
